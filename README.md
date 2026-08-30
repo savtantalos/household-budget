@@ -39,6 +39,11 @@ Shared expenses are pooled and divided evenly between everyone. Each person's
 person-to-person transfers; the dashboard turns those into "X pays Y £Z".
 Personal expenses (gym, car) stay with whoever pays them.
 
+## Documentation
+
+Full docs are in [`docs/`](docs/README.md) — architecture, how the frontend and backend
+talk to each other, where the data is stored, the budget formulas, and how to extend it.
+
 ## Development
 
 ```bash
