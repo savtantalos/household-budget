@@ -1,0 +1,141 @@
+from datetime import date
+
+from sqlmodel import SQLModel
+
+from .models import Frequency
+
+
+class PersonCreate(SQLModel):
+    name: str
+    colour: str = "#2f6fed"
+
+
+class PersonUpdate(SQLModel):
+    name: str | None = None
+    colour: str | None = None
+
+
+class IncomeCreate(SQLModel):
+    person_id: int
+    label: str
+    amount: float
+    frequency: Frequency = Frequency.monthly
+
+
+class IncomeUpdate(SQLModel):
+    person_id: int | None = None
+    label: str | None = None
+    amount: float | None = None
+    frequency: Frequency | None = None
+
+
+class ExpenseCreate(SQLModel):
+    payer_id: int
+    label: str
+    amount: float
+    category: str = "general"
+    due_day: int | None = None
+    shared: bool = True
+    frequency: Frequency = Frequency.monthly
+
+
+class ExpenseUpdate(SQLModel):
+    payer_id: int | None = None
+    label: str | None = None
+    amount: float | None = None
+    category: str | None = None
+    due_day: int | None = None
+    shared: bool | None = None
+    frequency: Frequency | None = None
+
+
+class TransferCreate(SQLModel):
+    from_person_id: int
+    to_person_id: int
+    label: str
+    amount: float
+    months_remaining: int | None = None
+
+
+class TransferUpdate(SQLModel):
+    from_person_id: int | None = None
+    to_person_id: int | None = None
+    label: str | None = None
+    amount: float | None = None
+    months_remaining: int | None = None
+
+
+class SavingsPlanCreate(SQLModel):
+    person_id: int
+    label: str = "Monthly savings"
+    monthly_amount: float
+
+
+class SavingsPlanUpdate(SQLModel):
+    person_id: int | None = None
+    label: str | None = None
+    monthly_amount: float | None = None
+
+
+class AccountCreate(SQLModel):
+    person_id: int
+    institution: str
+    balance: float
+    as_of: date | None = None
+
+
+class AccountUpdate(SQLModel):
+    person_id: int | None = None
+    institution: str | None = None
+    balance: float | None = None
+    as_of: date | None = None
+
+
+class PersonSummaryOut(SQLModel):
+    id: int
+    name: str
+    income: float
+    paid_shared: float
+    paid_personal: float
+    fair_share: float
+    transfers_out: float
+    transfers_in: float
+    savings: float
+    net_worth: float
+    settlement: float
+    true_cost: float
+    remaining: float
+    remaining_after_savings: float
+
+
+class SettlementOut(SQLModel):
+    from_person: str
+    to_person: str
+    amount: float
+
+
+class SummaryOut(SQLModel):
+    people: list[PersonSummaryOut]
+    settlements: list[SettlementOut]
+    total_income: float
+    total_expenses: float
+    shared_expenses: float
+    personal_expenses: float
+    total_savings: float
+    net_worth: float
+    cash_balance: float
+    spend_ratio: float
+
+
+class ProjectionPointOut(SQLModel):
+    month: int
+    year: float
+    contributed: float
+    balance: float
+
+
+class ProjectionOut(SQLModel):
+    starting_balance: float
+    monthly_contribution: float
+    annual_return_pct: float
+    points: list[ProjectionPointOut]

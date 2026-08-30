@@ -1,0 +1,12 @@
+[tool.ruff]
+line-length = 95
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+# FastAPI's dependency injection relies on calls in argument defaults.
+ignore = ["B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
