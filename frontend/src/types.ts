@@ -98,3 +98,37 @@ export interface Projection {
   annual_return_pct: number
   points: ProjectionPoint[]
 }
+
+export interface LumpSum {
+  month: number
+  amount: number
+}
+
+export interface MortgageInput {
+  principal: number
+  annual_rate_pct: number
+  term_years: number
+  monthly_overpayment: number
+  lump_sums: LumpSum[]
+}
+
+export interface MortgagePoint {
+  month: number
+  year: number
+  balance: number
+  interest_paid: number
+  principal_paid: number
+  baseline_balance: number
+}
+
+export interface Mortgage {
+  monthly_payment: number
+  months_to_repay: number
+  total_interest: number
+  total_paid: number
+  baseline_months_to_repay: number
+  baseline_total_interest: number
+  interest_saved: number
+  months_saved: number
+  points: MortgagePoint[]
+}

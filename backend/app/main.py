@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 
 from . import schemas
-from .budget import build_summary, project_savings
+from .budget import LumpSum, build_summary, project_savings, simulate_mortgage
 from .crud import crud_router
 from .db import get_session, init_db
 from .models import Account, Expense, Income, Person, SavingsPlan, Transfer
@@ -152,6 +152,41 @@ def get_projection(
                 month=p.month, year=p.year, contributed=p.contributed, balance=p.balance
             )
             for p in points
+        ],
+    )
+
+
+@app.post("/api/mortgage", response_model=schemas.MortgageOut, tags=["summary"])
+def post_mortgage(payload: schemas.MortgageIn) -> schemas.MortgageOut:
+    """Amortise a mortgage, with optional regular and one-off overpayments."""
+    result = simulate_mortgage(
+        principal=payload.principal,
+        annual_rate_pct=payload.annual_rate_pct,
+        term_years=payload.term_years,
+        monthly_overpayment=payload.monthly_overpayment,
+        lump_sums=[
+            LumpSum(month=lump.month, amount=lump.amount) for lump in payload.lump_sums
+        ],
+    )
+    return schemas.MortgageOut(
+        monthly_payment=result.monthly_payment,
+        months_to_repay=result.months_to_repay,
+        total_interest=result.total_interest,
+        total_paid=result.total_paid,
+        baseline_months_to_repay=result.baseline_months_to_repay,
+        baseline_total_interest=result.baseline_total_interest,
+        interest_saved=result.interest_saved,
+        months_saved=result.months_saved,
+        points=[
+            schemas.MortgagePointOut(
+                month=p.month,
+                year=p.year,
+                balance=p.balance,
+                interest_paid=p.interest_paid,
+                principal_paid=p.principal_paid,
+                baseline_balance=p.baseline_balance,
+            )
+            for p in result.points
         ],
     )
 

@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlmodel import SQLModel
+from sqlmodel import Field, SQLModel
 
 from .models import Frequency
 
@@ -139,3 +139,37 @@ class ProjectionOut(SQLModel):
     monthly_contribution: float
     annual_return_pct: float
     points: list[ProjectionPointOut]
+
+
+class LumpSumIn(SQLModel):
+    month: int = Field(ge=1)
+    amount: float = Field(ge=0)
+
+
+class MortgageIn(SQLModel):
+    principal: float = Field(gt=0)
+    annual_rate_pct: float = Field(ge=0, le=25)
+    term_years: int = Field(ge=1, le=40)
+    monthly_overpayment: float = Field(default=0.0, ge=0)
+    lump_sums: list[LumpSumIn] = []
+
+
+class MortgagePointOut(SQLModel):
+    month: int
+    year: float
+    balance: float
+    interest_paid: float
+    principal_paid: float
+    baseline_balance: float
+
+
+class MortgageOut(SQLModel):
+    monthly_payment: float
+    months_to_repay: int
+    total_interest: float
+    total_paid: float
+    baseline_months_to_repay: int
+    baseline_total_interest: float
+    interest_saved: float
+    months_saved: int
+    points: list[MortgagePointOut]

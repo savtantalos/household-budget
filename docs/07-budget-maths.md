@@ -107,7 +107,50 @@ Your seeded case: starting balance 88,009 (Barclays 55,259 + Revolut 1,750 + Geo
 
 Pass `person_id` to project one person's plan and accounts only.
 
-## 7.7 Where the assumptions are
+## 7.7 Mortgage repayment
+
+`simulate_mortgage()` runs the loan month by month. The scheduled repayment is the
+standard annuity formula:
+
+```
+r       = annual_rate / 100 / 12
+n       = term_years × 12
+payment = P × r × (1+r)^n / ((1+r)^n − 1)
+```
+
+£300,000 over 25 years at 4.5 % → **£1,667.50/month**.
+
+Then each month:
+
+```
+interest = balance × r
+paid     = payment + monthly_overpayment + any lump sum due this month
+balance  = balance + interest − paid        (never more than clears the debt)
+```
+
+The loop stops the month the balance hits zero, so the *mortgage life* is an output,
+not an input — overpaying shortens the term rather than reducing the monthly bill.
+Every run also amortises the same loan with **no** overpayments (the baseline), which is
+where "interest saved" and "years earlier" come from, and what the grey line on the
+chart shows.
+
+Worked example — £300k, 4.5 %, 25 years, £300/month extra plus a £20,000 lump sum in
+month 12:
+
+| | On plan | With overpayments |
+| --- | --- | --- |
+| Mortgage life | 25 years | 17y 1m |
+| Total interest | £200,249 | £122,892 |
+
+≈ £77,357 of interest saved and 95 months off the term, because every extra pound goes
+straight at the capital and stops accruing interest for the rest of the term. That is
+also why a lump sum paid early is worth much more than the same sum paid late.
+
+The endpoint is `POST /api/mortgage` — a POST because the lump-sum list is a body rather
+than a query string — and it touches no database. It is a pure calculator over the
+numbers you set in the Mortgage tab, so nothing there is saved between visits.
+
+## 7.8 Where the assumptions are
 
 Deliberately explicit and easy to change:
 
