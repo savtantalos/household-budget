@@ -10,18 +10,11 @@ import {
   YAxis,
 } from 'recharts'
 import { api } from '../api'
-import { money, moneyCompact, moneyTooltip } from '../format'
+import { describeLife, money, moneyCompact, moneyTooltip } from '../format'
 import type { LumpSum, Mortgage } from '../types'
+import { SliderInput } from './SliderInput'
 
 const MAX_CHART_POINTS = 120
-
-const describeLife = (months: number) => {
-  const years = Math.floor(months / 12)
-  const rest = months % 12
-  if (!years) return `${rest} month${rest === 1 ? '' : 's'}`
-  if (rest) return `${years}y ${rest}m`
-  return `${years} year${years === 1 ? '' : 's'}`
-}
 
 function Stat({
   label,
@@ -99,49 +92,41 @@ export function MortgagePanel() {
       <section className="card">
         <h2>Mortgage</h2>
         <div className="controls">
-          <label>
-            Amount owed: <strong>{money(principal)}</strong>
-            <input
-              type="range"
-              min={25000}
-              max={1000000}
-              step={5000}
-              value={principal}
-              onChange={(event) => setPrincipal(Number(event.target.value))}
-            />
-          </label>
-          <label>
-            Interest rate: <strong>{ratePct}%</strong>
-            <input
-              type="range"
-              min={0}
-              max={12}
-              step={0.05}
-              value={ratePct}
-              onChange={(event) => setRatePct(Number(event.target.value))}
-            />
-          </label>
-          <label>
-            Term: <strong>{termYears} years</strong>
-            <input
-              type="range"
-              min={1}
-              max={40}
-              value={termYears}
-              onChange={(event) => setTermYears(Number(event.target.value))}
-            />
-          </label>
-          <label>
-            Monthly overpayment: <strong>{money(overpayment)}</strong>
-            <input
-              type="range"
-              min={0}
-              max={3000}
-              step={25}
-              value={overpayment}
-              onChange={(event) => setOverpayment(Number(event.target.value))}
-            />
-          </label>
+          <SliderInput
+            label="Amount owed"
+            value={principal}
+            onChange={setPrincipal}
+            min={25000}
+            max={1000000}
+            step={5000}
+            format={money}
+          />
+          <SliderInput
+            label="Interest rate"
+            value={ratePct}
+            onChange={setRatePct}
+            min={0}
+            max={12}
+            step={0.05}
+            format={(value) => `${value}%`}
+          />
+          <SliderInput
+            label="Term"
+            value={termYears}
+            onChange={setTermYears}
+            min={1}
+            max={40}
+            format={(value) => `${value} years`}
+          />
+          <SliderInput
+            label="Monthly overpayment"
+            value={overpayment}
+            onChange={setOverpayment}
+            min={0}
+            max={3000}
+            step={25}
+            format={money}
+          />
         </div>
       </section>
 

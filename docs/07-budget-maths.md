@@ -150,7 +150,35 @@ The endpoint is `POST /api/mortgage` — a POST because the lump-sum list is a b
 than a query string — and it touches no database. It is a pure calculator over the
 numbers you set in the Mortgage tab, so nothing there is saved between visits.
 
-## 7.8 Where the assumptions are
+## 7.8 Invest or overpay?
+
+`compare_invest_vs_overpay()` answers one question: given the same spare cash every
+month, are you better off investing it or throwing it at the mortgage?
+
+Both strategies run for the full original term:
+
+- **Invest** — pay the scheduled mortgage, put the spare cash into investments
+  compounding monthly at the chosen annual return.
+- **Overpay** — put the spare cash into the mortgage instead. Once the mortgage
+  clears (early), invest the freed-up repayment *plus* the spare cash for the rest
+  of the term.
+
+The house is the same asset in both scenarios, so the comparison is
+`final pot − total mortgage interest paid` for each side. Roughly: **invest wins when
+the expected return beats the mortgage rate, overpay wins otherwise** — plus
+overpaying is risk-free while investment returns are not.
+
+Note the chart plots the *gross* pots over time; the winner and advantage figures are
+net of each side's mortgage interest. Deliberately ignored: taxes, fees, early
+repayment charges, rate changes and volatility. It is a model, not advice.
+
+## 7.9 Investment projection
+
+`GET /api/investment-projection` reuses `project_savings()` (§7.6) once per stored
+investment — each holding grows at *its own* expected return — and sums the monthly
+points. That is why the response's `annual_return_pct` is 0: there is no single rate.
+
+## 7.10 Where the assumptions are
 
 Deliberately explicit and easy to change:
 

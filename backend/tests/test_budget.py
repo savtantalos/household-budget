@@ -1,6 +1,7 @@
 from app.budget import (
     LumpSum,
     build_summary,
+    compare_invest_vs_overpay,
     monthly,
     mortgage_payment,
     project_savings,
@@ -150,3 +151,25 @@ def test_points_run_to_the_end_of_the_original_plan():
     assert result.points[-1].baseline_balance == 0.0
     assert result.points[result.months_to_repay].balance == 0.0
     assert result.points[result.months_to_repay].baseline_balance > 0
+
+
+def test_invest_wins_when_returns_beat_the_mortgage_rate():
+    result = compare_invest_vs_overpay(300_000, 3.0, 25, 500, annual_return_pct=8.0)
+    assert result.winner == "invest"
+    assert result.advantage > 0
+    assert result.invest_final_pot > result.overpay_final_pot
+
+
+def test_overpay_wins_when_the_mortgage_rate_beats_returns():
+    result = compare_invest_vs_overpay(300_000, 6.0, 25, 500, annual_return_pct=2.0)
+    assert result.winner == "overpay"
+    assert result.overpay_total_interest < result.invest_total_interest
+
+
+def test_comparison_frees_up_the_repayment_after_payoff():
+    result = compare_invest_vs_overpay(300_000, 4.5, 25, 1_000, annual_return_pct=4.5)
+    payoff = result.overpay_months_to_repay
+    assert payoff < 300
+    assert result.points[payoff].overpay_wealth == 0.0
+    assert result.points[payoff + 1].overpay_wealth > 0
+    assert result.points[-1].month == 300

@@ -18,7 +18,9 @@ Stack: **React 19** (UI), **TypeScript** (types), **Vite** (dev server + build),
 | `src/components/IncomePanel.tsx` | Income rows + person-to-person transfers |
 | `src/components/ExpensesPanel.tsx` | Editable expense table + add form |
 | `src/components/SavingsPanel.tsx` | Savings plans, accounts, simulator sliders + chart |
+| `src/components/InvestmentsPanel.tsx` | Investments table, growth chart, invest-vs-overpay comparison |
 | `src/components/MortgagePanel.tsx` | Mortgage sliders, lump-sum list, repayment chart |
+| `src/components/SliderInput.tsx` | Reusable slider + number box pair, kept in sync |
 | `src/App.css` | All styling, driven by CSS custom properties in `:root` |
 
 ## 6.2 How state works

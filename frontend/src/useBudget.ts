@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from './api'
-import type { Account, Expense, Income, Person, SavingsPlan, Summary, Transfer } from './types'
+import type {
+  Account,
+  Expense,
+  Income,
+  Investment,
+  Person,
+  SavingsPlan,
+  Summary,
+  Transfer,
+} from './types'
 
 export interface BudgetData {
   people: Person[]
@@ -9,6 +18,7 @@ export interface BudgetData {
   transfers: Transfer[]
   savingsPlans: SavingsPlan[]
   accounts: Account[]
+  investments: Investment[]
   summary: Summary
 }
 
@@ -19,17 +29,35 @@ export function useBudget() {
 
   const refresh = useCallback(async () => {
     try {
-      const [people, incomes, expenses, transfers, savingsPlans, accounts, summary] =
-        await Promise.all([
-          api.people.list(),
-          api.incomes.list(),
-          api.expenses.list(),
-          api.transfers.list(),
-          api.savingsPlans.list(),
-          api.accounts.list(),
-          api.summary(),
-        ])
-      setData({ people, incomes, expenses, transfers, savingsPlans, accounts, summary })
+      const [
+        people,
+        incomes,
+        expenses,
+        transfers,
+        savingsPlans,
+        accounts,
+        investments,
+        summary,
+      ] = await Promise.all([
+        api.people.list(),
+        api.incomes.list(),
+        api.expenses.list(),
+        api.transfers.list(),
+        api.savingsPlans.list(),
+        api.accounts.list(),
+        api.investments.list(),
+        api.summary(),
+      ])
+      setData({
+        people,
+        incomes,
+        expenses,
+        transfers,
+        savingsPlans,
+        accounts,
+        investments,
+        summary,
+      })
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load budget')

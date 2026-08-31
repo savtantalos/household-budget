@@ -77,6 +77,24 @@ class SavingsPlanUpdate(SQLModel):
     monthly_amount: float | None = None
 
 
+class InvestmentCreate(SQLModel):
+    person_id: int
+    name: str
+    category: str = "index fund"
+    balance: float = 0.0
+    monthly_contribution: float = 0.0
+    annual_return_pct: float = 5.0
+
+
+class InvestmentUpdate(SQLModel):
+    person_id: int | None = None
+    name: str | None = None
+    category: str | None = None
+    balance: float | None = None
+    monthly_contribution: float | None = None
+    annual_return_pct: float | None = None
+
+
 class AccountCreate(SQLModel):
     person_id: int
     institution: str
@@ -173,3 +191,30 @@ class MortgageOut(SQLModel):
     interest_saved: float
     months_saved: int
     points: list[MortgagePointOut]
+
+
+class InvestVsOverpayIn(SQLModel):
+    principal: float = Field(gt=0)
+    annual_rate_pct: float = Field(ge=0, le=25)
+    term_years: int = Field(ge=1, le=40)
+    monthly_amount: float = Field(gt=0)
+    annual_return_pct: float = Field(ge=0, le=30)
+
+
+class InvestVsOverpayPointOut(SQLModel):
+    month: int
+    year: float
+    invest_wealth: float
+    overpay_wealth: float
+
+
+class InvestVsOverpayOut(SQLModel):
+    monthly_payment: float
+    invest_final_pot: float
+    invest_total_interest: float
+    overpay_months_to_repay: int
+    overpay_final_pot: float
+    overpay_total_interest: float
+    winner: str
+    advantage: float
+    points: list[InvestVsOverpayPointOut]

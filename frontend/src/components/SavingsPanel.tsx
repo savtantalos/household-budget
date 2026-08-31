@@ -12,6 +12,7 @@ import {
 import { api } from '../api'
 import { money, moneyCompact, moneyTooltip } from '../format'
 import type { Account, Person, Projection, SavingsPlan } from '../types'
+import { SliderInput } from './SliderInput'
 
 interface Props {
   savingsPlans: SavingsPlan[]
@@ -176,27 +177,16 @@ export function SavingsPanel({ savingsPlans, accounts, people, onChange }: Props
       <section className="card">
         <h2>Savings simulator</h2>
         <div className="controls">
-          <label>
-            Years: <strong>{years}</strong>
-            <input
-              type="range"
-              min={1}
-              max={30}
-              value={years}
-              onChange={(event) => setYears(Number(event.target.value))}
-            />
-          </label>
-          <label>
-            Annual return: <strong>{returnPct}%</strong>
-            <input
-              type="range"
-              min={0}
-              max={12}
-              step={0.5}
-              value={returnPct}
-              onChange={(event) => setReturnPct(Number(event.target.value))}
-            />
-          </label>
+          <SliderInput label="Years" value={years} onChange={setYears} min={1} max={30} />
+          <SliderInput
+            label="Annual return"
+            value={returnPct}
+            onChange={setReturnPct}
+            min={0}
+            max={12}
+            step={0.5}
+            format={(value) => `${value}%`}
+          />
         </div>
         {projection && (
           <p className="muted">
