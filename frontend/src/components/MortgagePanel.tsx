@@ -13,6 +13,8 @@ import { api } from '../api'
 import { money, moneyCompact, moneyTooltip } from '../format'
 import type { LumpSum, Mortgage } from '../types'
 
+const MAX_CHART_POINTS = 120
+
 const describeLife = (months: number) => {
   const years = Math.floor(months / 12)
   const rest = months % 12
@@ -72,17 +74,17 @@ export function MortgagePanel() {
     return () => clearTimeout(timer)
   }, [principal, ratePct, termYears, overpayment, lumpSums])
 
-  const chartData = useMemo(
-    () =>
-      result?.points
-        .filter((point) => point.month % 3 === 0 || point.month === 0)
-        .map((point) => ({
-          year: point.year,
-          'With overpayments': point.balance,
-          'Original plan': point.baseline_balance,
-        })) ?? [],
-    [result],
-  )
+  const chartData = useMemo(() => {
+    const points = result?.points ?? []
+    const step = Math.max(1, Math.ceil(points.length / MAX_CHART_POINTS))
+    return points
+      .filter((_, index) => index % step === 0 || index === points.length - 1)
+      .map((point) => ({
+        year: point.year,
+        'With overpayments': point.balance,
+        'Original plan': point.baseline_balance,
+      }))
+  }, [result])
 
   const addLumpSum = (event: React.FormEvent) => {
     event.preventDefault()

@@ -140,3 +140,13 @@ def test_final_payment_never_overpays_the_balance():
     result = simulate_mortgage(10_000, 5.0, 2, monthly_overpayment=5_000)
     assert result.points[-1].balance == 0.0
     assert result.total_paid == round(10_000 + result.total_interest, 2)
+
+
+def test_points_run_to_the_end_of_the_original_plan():
+    result = simulate_mortgage(300_000, 4.5, 25, monthly_overpayment=1_000)
+    assert result.months_to_repay < result.baseline_months_to_repay
+    assert result.points[-1].month == result.baseline_months_to_repay
+    assert result.points[-1].balance == 0.0
+    assert result.points[-1].baseline_balance == 0.0
+    assert result.points[result.months_to_repay].balance == 0.0
+    assert result.points[result.months_to_repay].baseline_balance > 0

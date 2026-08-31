@@ -244,11 +244,13 @@ def simulate_mortgage(
     baseline = _amortise(principal, monthly_rate, payment, horizon)
     actual = _amortise(principal, monthly_rate, payment, horizon, monthly_overpayment, lumps)
 
-    baseline_balances = {month: balance for month, balance, _ in baseline}
-    last_baseline = baseline[-1][1] if baseline else principal
+    baseline_rows = {month: (balance, interest) for month, balance, interest in baseline}
+    actual_rows = {month: (balance, interest) for month, balance, interest in actual}
     points = [MortgagePoint(0, 0.0, round(principal, 2), 0.0, 0.0, round(principal, 2))]
     interest_total = 0.0
-    for month, balance, interest in actual:
+    # Runs to whichever plan lasts longer so the chart can compare the two to the end.
+    for month in range(1, max(len(actual), len(baseline)) + 1):
+        balance, interest = actual_rows.get(month, (0.0, 0.0))
         interest_total += interest
         points.append(
             MortgagePoint(
@@ -257,7 +259,7 @@ def simulate_mortgage(
                 balance=round(balance, 2),
                 interest_paid=round(interest_total, 2),
                 principal_paid=round(principal - balance, 2),
-                baseline_balance=round(baseline_balances.get(month, last_baseline), 2),
+                baseline_balance=round(baseline_rows.get(month, (0.0, 0.0))[0], 2),
             )
         )
 
