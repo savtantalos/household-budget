@@ -159,6 +159,125 @@ def build_summary(
 
 
 @dataclass
+class LumpSum:
+    """A one-off overpayment made in a given month (1 = first month)."""
+
+    month: int
+    amount: float
+
+
+@dataclass
+class MortgagePoint:
+    month: int
+    year: float
+    balance: float
+    interest_paid: float
+    principal_paid: float
+    baseline_balance: float
+
+
+@dataclass
+class MortgageResult:
+    monthly_payment: float
+    months_to_repay: int
+    total_interest: float
+    total_paid: float
+    baseline_months_to_repay: int
+    baseline_total_interest: float
+    interest_saved: float
+    months_saved: int
+    points: list[MortgagePoint] = field(default_factory=list)
+
+
+def mortgage_payment(principal: float, annual_rate_pct: float, term_years: int) -> float:
+    """Scheduled monthly repayment for a repayment (capital + interest) mortgage."""
+    months = term_years * MONTHS_PER_YEAR
+    if months <= 0:
+        return 0.0
+    rate = annual_rate_pct / 100 / MONTHS_PER_YEAR
+    if rate == 0:
+        return principal / months
+    factor = (1 + rate) ** months
+    return principal * rate * factor / (factor - 1)
+
+
+def _amortise(
+    principal: float,
+    monthly_rate: float,
+    payment: float,
+    max_months: int,
+    monthly_overpayment: float = 0.0,
+    lump_sums: dict[int, float] | None = None,
+) -> list[tuple[int, float, float]]:
+    """Run the loan month by month, returning (month, balance, interest_this_month)."""
+    lumps = lump_sums or {}
+    balance = principal
+    rows: list[tuple[int, float, float]] = []
+    for month in range(1, max_months + 1):
+        if balance <= 0:
+            break
+        interest = balance * monthly_rate
+        paid = min(balance + interest, payment + monthly_overpayment + lumps.get(month, 0.0))
+        balance = balance + interest - paid
+        if balance < 0.005:
+            balance = 0.0
+        rows.append((month, balance, interest))
+    return rows
+
+
+def simulate_mortgage(
+    principal: float,
+    annual_rate_pct: float,
+    term_years: int,
+    monthly_overpayment: float = 0.0,
+    lump_sums: list[LumpSum] | None = None,
+) -> MortgageResult:
+    """Amortise a mortgage with and without overpayments and compare the two."""
+    payment = mortgage_payment(principal, annual_rate_pct, term_years)
+    monthly_rate = annual_rate_pct / 100 / MONTHS_PER_YEAR
+    horizon = term_years * MONTHS_PER_YEAR
+    lumps: dict[int, float] = {}
+    for lump in lump_sums or []:
+        if lump.month >= 1 and lump.amount > 0:
+            lumps[lump.month] = lumps.get(lump.month, 0.0) + lump.amount
+
+    baseline = _amortise(principal, monthly_rate, payment, horizon)
+    actual = _amortise(principal, monthly_rate, payment, horizon, monthly_overpayment, lumps)
+
+    baseline_rows = {month: (balance, interest) for month, balance, interest in baseline}
+    actual_rows = {month: (balance, interest) for month, balance, interest in actual}
+    points = [MortgagePoint(0, 0.0, round(principal, 2), 0.0, 0.0, round(principal, 2))]
+    interest_total = 0.0
+    # Runs to whichever plan lasts longer so the chart can compare the two to the end.
+    for month in range(1, max(len(actual), len(baseline)) + 1):
+        balance, interest = actual_rows.get(month, (0.0, 0.0))
+        interest_total += interest
+        points.append(
+            MortgagePoint(
+                month=month,
+                year=round(month / MONTHS_PER_YEAR, 2),
+                balance=round(balance, 2),
+                interest_paid=round(interest_total, 2),
+                principal_paid=round(principal - balance, 2),
+                baseline_balance=round(baseline_rows.get(month, (0.0, 0.0))[0], 2),
+            )
+        )
+
+    baseline_interest = sum(interest for _, _, interest in baseline)
+    return MortgageResult(
+        monthly_payment=round(payment, 2),
+        months_to_repay=len(actual),
+        total_interest=round(interest_total, 2),
+        total_paid=round(principal + interest_total, 2),
+        baseline_months_to_repay=len(baseline),
+        baseline_total_interest=round(baseline_interest, 2),
+        interest_saved=round(baseline_interest - interest_total, 2),
+        months_saved=len(baseline) - len(actual),
+        points=points,
+    )
+
+
+@dataclass
 class ProjectionPoint:
     month: int
     year: float

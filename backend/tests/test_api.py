@@ -70,3 +70,30 @@ def test_projection_endpoint(client):
     assert payload["starting_balance"] == 88009
     assert len(payload["points"]) == 37
     assert payload["points"][-1]["balance"] == 88009 + 3500 * 36
+
+
+def test_mortgage_endpoint_compares_against_the_original_plan(client):
+    response = client.post(
+        "/api/mortgage",
+        json={
+            "principal": 300000,
+            "annual_rate_pct": 4.5,
+            "term_years": 25,
+            "monthly_overpayment": 300,
+            "lump_sums": [{"month": 12, "amount": 20000}],
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["monthly_payment"] == 1667.5
+    assert body["months_to_repay"] < body["baseline_months_to_repay"]
+    assert body["interest_saved"] > 0
+    assert body["points"][-1]["balance"] == 0.0
+
+
+def test_mortgage_rejects_a_negative_principal(client):
+    response = client.post(
+        "/api/mortgage",
+        json={"principal": -1, "annual_rate_pct": 4.5, "term_years": 25},
+    )
+    assert response.status_code == 422

@@ -11,8 +11,8 @@ Pydantic) + **Uvicorn** (server) + **SQLite** (storage).
 | `app/models.py` | Table definitions (`Person`, `Income`, `Expense`, `Transfer`, `SavingsPlan`, `Account`) |
 | `app/schemas.py` | Request/response shapes — what the API accepts and returns |
 | `app/crud.py` | `crud_router()` factory: list/create/update/delete for any model |
-| `app/budget.py` | Pure maths: normalisation, splitting, settlement, projection |
-| `app/main.py` | App creation, CORS, router wiring, `/api/summary`, `/api/projection`, `/api/health` |
+| `app/budget.py` | Pure maths: normalisation, splitting, settlement, projection, mortgage |
+| `app/main.py` | App creation, CORS, router wiring, `/api/summary`, `/api/projection`, `/api/mortgage`, `/api/health` |
 | `app/seed.py` | Inserts the starting budget |
 | `tests/` | `test_budget.py` (maths), `test_api.py` (HTTP behaviour) |
 
@@ -62,7 +62,11 @@ Base path: `/api`.
 | DELETE | `<path>/{id}` | – | 204 no content |
 | GET | `/summary` | – | totals, per-person breakdown, settlements |
 | GET | `/projection?years=&annual_return_pct=&person_id=` | – | monthly balance points |
+| POST | `/mortgage` | principal, rate, term, overpayments | repayment, term, interest, balance points |
 | GET | `/health` | – | `{"status": "ok"}` |
+
+`/mortgage` is the odd one out: a POST that writes nothing. It is a calculator, and the
+lump-sum list has to travel in a JSON body rather than a query string.
 
 Interactive docs: <http://127.0.0.1:8000/docs> (Swagger UI, generated from the code).
 

@@ -31,6 +31,7 @@ The Vite dev server proxies `/api` to the backend, so the UI needs no configurat
 | Income | Salaries and other income, plus recurring person-to-person transfers (e.g. loan repayments) |
 | Expenses | Every monthly cost — editable inline, marked shared or personal, categorised |
 | Savings | Monthly savings plans, account balances, and a compound-growth simulator |
+| Mortgage | Repayment simulator: monthly overpayments and one-off lump sums vs the original plan, with interest saved and years shaved off |
 
 ### How the split works
 

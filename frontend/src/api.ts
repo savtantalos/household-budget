@@ -2,6 +2,8 @@ import type {
   Account,
   Expense,
   Income,
+  Mortgage,
+  MortgageInput,
   Person,
   Projection,
   SavingsPlan,
@@ -49,4 +51,6 @@ export const api = {
   summary: () => request<Summary>('/summary'),
   projection: (years: number, annualReturnPct: number) =>
     request<Projection>(`/projection?years=${years}&annual_return_pct=${annualReturnPct}`),
+  mortgage: (input: MortgageInput) =>
+    request<Mortgage>('/mortgage', { method: 'POST', body: JSON.stringify(input) }),
 }
