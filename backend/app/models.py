@@ -71,6 +71,20 @@ class Investment(SQLModel, table=True):
     annual_return_pct: float = 5.0
 
 
+class SplitMode(str, Enum):
+    """How shared costs are settled between people."""
+
+    even = "even"
+    difference = "difference"
+
+
+class Setting(SQLModel, table=True):
+    """Single-row household preferences."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    split_mode: SplitMode = SplitMode.even
+
+
 class Account(SQLModel, table=True):
     """A point-in-time balance for a savings/investment account."""
 

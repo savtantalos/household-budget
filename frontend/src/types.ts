@@ -93,6 +93,13 @@ export interface Summary {
   net_worth: number
   cash_balance: number
   spend_ratio: number
+  split_mode: SplitMode
+}
+
+export type SplitMode = 'even' | 'difference'
+
+export interface Settings {
+  split_mode: SplitMode
 }
 
 export interface ProjectionPoint {

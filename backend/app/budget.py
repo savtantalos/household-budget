@@ -2,7 +2,16 @@
 
 from dataclasses import dataclass, field
 
-from .models import Account, Expense, Frequency, Income, Person, SavingsPlan, Transfer
+from .models import (
+    Account,
+    Expense,
+    Frequency,
+    Income,
+    Person,
+    SavingsPlan,
+    SplitMode,
+    Transfer,
+)
 
 MONTHS_PER_YEAR = 12
 
@@ -63,6 +72,7 @@ class Summary:
     personal_expenses: float = 0.0
     total_savings: float = 0.0
     net_worth: float = 0.0
+    split_mode: SplitMode = SplitMode.even
 
     @property
     def cash_balance(self) -> float:
@@ -104,6 +114,22 @@ def _settle(people: list[PersonSummary]) -> list[Settlement]:
     return settlements
 
 
+def _fair_share(
+    paid_shared: float, total_shared: float, people_count: int, split_mode: SplitMode
+) -> float:
+    """How much of the shared pot a person should end up carrying.
+
+    ``even`` gives everyone the same slice. ``difference`` settles the gap in
+    full instead: with two people, whoever paid less sends the other the whole
+    difference, so each ends up carrying what the other paid in.
+    """
+    if not people_count:
+        return 0.0
+    if split_mode == SplitMode.difference and people_count > 1:
+        return (total_shared - paid_shared) / (people_count - 1)
+    return total_shared / people_count
+
+
 def build_summary(
     people: list[Person],
     incomes: list[Income],
@@ -111,9 +137,10 @@ def build_summary(
     transfers: list[Transfer],
     plans: list[SavingsPlan],
     accounts: list[Account],
+    split_mode: SplitMode = SplitMode.even,
 ) -> Summary:
     by_id = {p.id: PersonSummary(id=p.id or 0, name=p.name) for p in people}
-    summary = Summary(people=list(by_id.values()))
+    summary = Summary(people=list(by_id.values()), split_mode=split_mode)
 
     for income in incomes:
         if income.person_id in by_id:
@@ -146,9 +173,13 @@ def build_summary(
         if account.person_id in by_id:
             by_id[account.person_id].net_worth += account.balance
 
-    share = summary.shared_expenses / len(by_id) if by_id else 0.0
     for person in by_id.values():
-        person.fair_share = share
+        person.fair_share = _fair_share(
+            paid_shared=person.paid_shared,
+            total_shared=summary.shared_expenses,
+            people_count=len(by_id),
+            split_mode=split_mode,
+        )
 
     summary.total_income = sum(p.income for p in by_id.values())
     summary.total_expenses = summary.shared_expenses + summary.personal_expenses

@@ -85,6 +85,7 @@ months_remaining                                     institution
 | `savingsplan` | Intended monthly saving per person | Savvas, 2500 |
 | `account` | A balance snapshot for net worth | Savvas, Barclays, 55259, as of today |
 | `investment` | A holding that grows: value, monthly top-up, expected return | Savvas, "Global index fund", 10000, +500/month, 7% |
+| `setting` | Household preferences, one row | `split_mode = even` |
 
 ### What is *not* stored
 

@@ -41,6 +41,33 @@ def test_seeded_summary(client):
     ]
 
 
+def test_split_mode_setting_changes_the_settlement(client):
+    assert client.get("/api/settings").json() == {"split_mode": "even"}
+
+    updated = client.patch("/api/settings", json={"split_mode": "difference"})
+    assert updated.status_code == 200
+    assert updated.json() == {"split_mode": "difference"}
+
+    summary = client.get("/api/summary").json()
+    savvas, georgia = summary["people"]
+    assert summary["split_mode"] == "difference"
+    assert savvas["fair_share"] == georgia["paid_shared"]
+    assert georgia["fair_share"] == savvas["paid_shared"]
+    # Georgia paid £3,002.65 more into the shared pot; the loan nets off £778.62.
+    assert summary["settlements"] == [
+        {"from_person": "Savvas", "to_person": "Georgia", "amount": 2224.03}
+    ]
+
+    client.patch("/api/settings", json={"split_mode": "even"})
+    assert client.get("/api/summary").json()["settlements"] == [
+        {"from_person": "Savvas", "to_person": "Georgia", "amount": 722.7}
+    ]
+
+
+def test_settings_rejects_an_unknown_split_mode(client):
+    assert client.patch("/api/settings", json={"split_mode": "vibes"}).status_code == 422
+
+
 def test_expense_crud_updates_summary(client):
     before = client.get("/api/summary").json()["total_expenses"]
 

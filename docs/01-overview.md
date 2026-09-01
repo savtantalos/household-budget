@@ -6,7 +6,8 @@ Your spreadsheet did four jobs:
 
 1. listed income for both of you,
 2. listed monthly expenses and who pays them,
-3. worked out who owes who once the shared costs are split evenly,
+3. worked out who owes who once the shared costs are settled (split evenly, or paid in
+   full by whoever put in less — your choice on the Dashboard),
 4. projected savings forward a number of years.
 
 The web app does the same four jobs, but the numbers live in a database instead of
