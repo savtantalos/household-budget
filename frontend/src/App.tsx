@@ -3,11 +3,12 @@ import './App.css'
 import { Dashboard } from './components/Dashboard'
 import { ExpensesPanel } from './components/ExpensesPanel'
 import { IncomePanel } from './components/IncomePanel'
+import { InvestmentsPanel } from './components/InvestmentsPanel'
 import { MortgagePanel } from './components/MortgagePanel'
 import { SavingsPanel } from './components/SavingsPanel'
 import { useBudget } from './useBudget'
 
-const TABS = ['Dashboard', 'Income', 'Expenses', 'Savings', 'Mortgage'] as const
+const TABS = ['Dashboard', 'Income', 'Expenses', 'Savings', 'Investments', 'Mortgage'] as const
 type Tab = (typeof TABS)[number]
 
 export default function App() {
@@ -63,6 +64,13 @@ export default function App() {
             <SavingsPanel
               savingsPlans={data.savingsPlans}
               accounts={data.accounts}
+              people={data.people}
+              onChange={refresh}
+            />
+          )}
+          {tab === 'Investments' && (
+            <InvestmentsPanel
+              investments={data.investments}
               people={data.people}
               onChange={refresh}
             />

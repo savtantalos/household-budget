@@ -9,7 +9,15 @@ from datetime import date
 from sqlmodel import Session, delete, select
 
 from .db import engine, init_db
-from .models import Account, Expense, Income, Person, SavingsPlan, Transfer
+from .models import (
+    Account,
+    Expense,
+    Income,
+    Investment,
+    Person,
+    SavingsPlan,
+    Transfer,
+)
 
 PEOPLE = [("Savvas", "#2f6fed"), ("Georgia", "#e0629b")]
 
@@ -32,6 +40,12 @@ TRANSFERS = [("Georgia", "Savvas", "Barclays loan repayment", 778.62, 48)]
 
 SAVINGS_PLANS = [("Savvas", 2500.0), ("Georgia", 1000.0)]
 
+# (person, name, category, balance, monthly contribution, expected annual return %)
+INVESTMENTS = [
+    ("Savvas", "Global index fund", "index fund", 10000.0, 500.0, 7.0),
+    ("Georgia", "Stocks & shares ISA", "ISA", 5000.0, 250.0, 5.0),
+]
+
 ACCOUNTS = [
     ("Savvas", "Barclays", 55259.0),
     ("Savvas", "Revolut", 1750.0),
@@ -41,7 +55,7 @@ ACCOUNTS = [
 
 def seed(session: Session, reset: bool = False) -> None:
     if reset:
-        for model in (Account, SavingsPlan, Transfer, Expense, Income, Person):
+        for model in (Account, Investment, SavingsPlan, Transfer, Expense, Income, Person):
             session.exec(delete(model))
         session.commit()
 
@@ -82,6 +96,18 @@ def seed(session: Session, reset: bool = False) -> None:
 
     for name, amount in SAVINGS_PLANS:
         session.add(SavingsPlan(person_id=people[name].id, monthly_amount=amount))
+
+    for name, label, category, balance, contribution, return_pct in INVESTMENTS:
+        session.add(
+            Investment(
+                person_id=people[name].id,
+                name=label,
+                category=category,
+                balance=balance,
+                monthly_contribution=contribution,
+                annual_return_pct=return_pct,
+            )
+        )
 
     for name, institution, balance in ACCOUNTS:
         session.add(

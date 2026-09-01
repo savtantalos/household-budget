@@ -97,3 +97,74 @@ def test_mortgage_rejects_a_negative_principal(client):
         json={"principal": -1, "annual_rate_pct": 4.5, "term_years": 25},
     )
     assert response.status_code == 422
+
+
+def test_investment_crud(client):
+    created = client.post(
+        "/api/investments",
+        json={
+            "person_id": 1,
+            "name": "Pension",
+            "category": "pension",
+            "balance": 20000,
+            "monthly_contribution": 400,
+            "annual_return_pct": 6,
+        },
+    )
+    assert created.status_code == 201
+    investment_id = created.json()["id"]
+
+    listed = client.get("/api/investments").json()
+    assert any(item["name"] == "Pension" for item in listed)
+
+    patched = client.patch(
+        f"/api/investments/{investment_id}", json={"monthly_contribution": 450}
+    )
+    assert patched.json()["monthly_contribution"] == 450
+
+    assert client.delete(f"/api/investments/{investment_id}").status_code == 204
+
+
+def test_investment_projection_sums_every_holding(client):
+    payload = client.get("/api/investment-projection", params={"years": 5}).json()
+
+    # Seeded: 10,000 + 5,000 today, 500 + 250 per month.
+    assert payload["starting_balance"] == 15000
+    assert payload["monthly_contribution"] == 750
+    assert len(payload["points"]) == 61
+    assert payload["points"][0]["balance"] == 15000
+    assert payload["points"][-1]["balance"] > 15000 + 750 * 60  # growth beats deposits
+
+
+def test_invest_vs_overpay_endpoint(client):
+    response = client.post(
+        "/api/invest-vs-overpay",
+        json={
+            "principal": 300000,
+            "annual_rate_pct": 4.5,
+            "term_years": 25,
+            "monthly_amount": 500,
+            "annual_return_pct": 7,
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["winner"] in {"invest", "overpay"}
+    assert body["overpay_months_to_repay"] < 300
+    assert len(body["points"]) == 301
+    assert body["points"][-1]["invest_wealth"] > 0
+    assert body["points"][-1]["overpay_wealth"] > 0
+
+
+def test_invest_vs_overpay_rejects_zero_monthly_amount(client):
+    response = client.post(
+        "/api/invest-vs-overpay",
+        json={
+            "principal": 300000,
+            "annual_rate_pct": 4.5,
+            "term_years": 25,
+            "monthly_amount": 0,
+            "annual_return_pct": 7,
+        },
+    )
+    assert response.status_code == 422

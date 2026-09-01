@@ -49,6 +49,16 @@ export interface Account {
   as_of: string
 }
 
+export interface Investment {
+  id: number
+  person_id: number
+  name: string
+  category: string
+  balance: number
+  monthly_contribution: number
+  annual_return_pct: number
+}
+
 export interface PersonSummary {
   id: number
   name: string
@@ -131,4 +141,31 @@ export interface Mortgage {
   interest_saved: number
   months_saved: number
   points: MortgagePoint[]
+}
+
+export interface ComparisonInput {
+  principal: number
+  annual_rate_pct: number
+  term_years: number
+  monthly_amount: number
+  annual_return_pct: number
+}
+
+export interface ComparisonPoint {
+  month: number
+  year: number
+  invest_wealth: number
+  overpay_wealth: number
+}
+
+export interface Comparison {
+  monthly_payment: number
+  invest_final_pot: number
+  invest_total_interest: number
+  overpay_months_to_repay: number
+  overpay_final_pot: number
+  overpay_total_interest: number
+  winner: string
+  advantage: number
+  points: ComparisonPoint[]
 }

@@ -6,10 +6,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 
 from . import schemas
-from .budget import LumpSum, build_summary, project_savings, simulate_mortgage
+from .budget import (
+    LumpSum,
+    build_summary,
+    compare_invest_vs_overpay,
+    project_savings,
+    simulate_mortgage,
+)
 from .crud import crud_router
 from .db import get_session, init_db
-from .models import Account, Expense, Income, Person, SavingsPlan, Transfer
+from .models import Account, Expense, Income, Investment, Person, SavingsPlan, Transfer
 
 
 @asynccontextmanager
@@ -63,6 +69,13 @@ for router in (
         update_model=schemas.SavingsPlanUpdate,
         prefix="/savings-plans",
         tag="savings plans",
+    ),
+    crud_router(
+        model=Investment,
+        create_model=schemas.InvestmentCreate,
+        update_model=schemas.InvestmentUpdate,
+        prefix="/investments",
+        tag="investments",
     ),
     crud_router(
         model=Account,
@@ -185,6 +198,81 @@ def post_mortgage(payload: schemas.MortgageIn) -> schemas.MortgageOut:
                 interest_paid=p.interest_paid,
                 principal_paid=p.principal_paid,
                 baseline_balance=p.baseline_balance,
+            )
+            for p in result.points
+        ],
+    )
+
+
+@app.get(
+    "/api/investment-projection", response_model=schemas.ProjectionOut, tags=["summary"]
+)
+def get_investment_projection(
+    years: int = Query(10, ge=1, le=50),
+    session: Session = Depends(get_session),
+) -> schemas.ProjectionOut:
+    """Grow every investment at its own expected return and sum the results."""
+    investments = list(session.exec(select(Investment)).all())
+    months = years * 12
+    totals = [0.0] * (months + 1)
+    contributed = [0.0] * (months + 1)
+    for inv in investments:
+        points = project_savings(
+            starting_balance=inv.balance,
+            monthly_contribution=inv.monthly_contribution,
+            years=years,
+            annual_return_pct=inv.annual_return_pct,
+        )
+        for p in points:
+            totals[p.month] += p.balance
+            contributed[p.month] += p.contributed
+    return schemas.ProjectionOut(
+        starting_balance=round(sum(inv.balance for inv in investments), 2),
+        monthly_contribution=round(
+            sum(inv.monthly_contribution for inv in investments), 2
+        ),
+        annual_return_pct=0.0,
+        points=[
+            schemas.ProjectionPointOut(
+                month=month,
+                year=round(month / 12, 2),
+                contributed=round(contributed[month], 2),
+                balance=round(totals[month], 2),
+            )
+            for month in range(months + 1)
+        ],
+    )
+
+
+@app.post(
+    "/api/invest-vs-overpay", response_model=schemas.InvestVsOverpayOut, tags=["summary"]
+)
+def post_invest_vs_overpay(
+    payload: schemas.InvestVsOverpayIn,
+) -> schemas.InvestVsOverpayOut:
+    """Compare investing spare cash against overpaying the mortgage with it."""
+    result = compare_invest_vs_overpay(
+        principal=payload.principal,
+        annual_rate_pct=payload.annual_rate_pct,
+        term_years=payload.term_years,
+        monthly_amount=payload.monthly_amount,
+        annual_return_pct=payload.annual_return_pct,
+    )
+    return schemas.InvestVsOverpayOut(
+        monthly_payment=result.monthly_payment,
+        invest_final_pot=result.invest_final_pot,
+        invest_total_interest=result.invest_total_interest,
+        overpay_months_to_repay=result.overpay_months_to_repay,
+        overpay_final_pot=result.overpay_final_pot,
+        overpay_total_interest=result.overpay_total_interest,
+        winner=result.winner,
+        advantage=result.advantage,
+        points=[
+            schemas.InvestVsOverpayPointOut(
+                month=p.month,
+                year=p.year,
+                invest_wealth=p.invest_wealth,
+                overpay_wealth=p.overpay_wealth,
             )
             for p in result.points
         ],

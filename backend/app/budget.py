@@ -278,6 +278,88 @@ def simulate_mortgage(
 
 
 @dataclass
+class ComparisonPoint:
+    month: int
+    year: float
+    invest_wealth: float
+    overpay_wealth: float
+
+
+@dataclass
+class ComparisonResult:
+    monthly_payment: float
+    invest_final_pot: float
+    invest_total_interest: float
+    overpay_months_to_repay: int
+    overpay_final_pot: float
+    overpay_total_interest: float
+    winner: str
+    advantage: float
+    points: list[ComparisonPoint] = field(default_factory=list)
+
+
+def compare_invest_vs_overpay(
+    principal: float,
+    annual_rate_pct: float,
+    term_years: int,
+    monthly_amount: float,
+    annual_return_pct: float,
+) -> ComparisonResult:
+    """Same spare cash each month, two strategies, compared over the full term.
+
+    *Invest*: pay the scheduled mortgage and put ``monthly_amount`` into
+    investments returning ``annual_return_pct``. *Overpay*: put it into the
+    mortgage instead; once the mortgage clears, invest the freed-up repayment
+    plus the spare cash for the rest of the term. Wealth here means the
+    investment pot only — the house is the same in both scenarios.
+    """
+    payment = mortgage_payment(principal, annual_rate_pct, term_years)
+    monthly_rate = annual_rate_pct / 100 / MONTHS_PER_YEAR
+    growth = (1 + annual_return_pct / 100) ** (1 / MONTHS_PER_YEAR) - 1
+    horizon = term_years * MONTHS_PER_YEAR
+
+    baseline = _amortise(principal, monthly_rate, payment, horizon)
+    overpaid = _amortise(principal, monthly_rate, payment, horizon, monthly_amount)
+    overpay_months = len(overpaid)
+
+    invest_pot = 0.0
+    overpay_pot = 0.0
+    points = [ComparisonPoint(0, 0.0, 0.0, 0.0)]
+    for month in range(1, horizon + 1):
+        invest_pot = invest_pot * (1 + growth) + monthly_amount
+        overpay_pot *= 1 + growth
+        if month > overpay_months:
+            overpay_pot += payment + monthly_amount
+        points.append(
+            ComparisonPoint(
+                month=month,
+                year=round(month / MONTHS_PER_YEAR, 2),
+                invest_wealth=round(invest_pot, 2),
+                overpay_wealth=round(overpay_pot, 2),
+            )
+        )
+
+    invest_interest = sum(interest for _, _, interest in baseline)
+    overpay_interest = sum(interest for _, _, interest in overpaid)
+    # Interest is money gone, so it counts against each strategy's final pot.
+    invest_net = invest_pot - invest_interest
+    overpay_net = overpay_pot - overpay_interest
+    advantage = abs(invest_net - overpay_net)
+    winner = "invest" if invest_net > overpay_net else "overpay"
+    return ComparisonResult(
+        monthly_payment=round(payment, 2),
+        invest_final_pot=round(invest_pot, 2),
+        invest_total_interest=round(invest_interest, 2),
+        overpay_months_to_repay=overpay_months,
+        overpay_final_pot=round(overpay_pot, 2),
+        overpay_total_interest=round(overpay_interest, 2),
+        winner=winner,
+        advantage=round(advantage, 2),
+        points=points,
+    )
+
+
+@dataclass
 class ProjectionPoint:
     month: int
     year: float

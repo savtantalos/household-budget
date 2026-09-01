@@ -263,6 +263,23 @@ label.inline {
   flex-wrap: wrap;
 }
 
+.slider-input-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.slider-input-row input[type='range'] {
+  flex: 1;
+  padding: 0;
+}
+
+.slider-input-row input[type='number'] {
+  width: 110px;
+  border-color: var(--border);
+  background: #fff;
+}
+
 .controls label {
   display: flex;
   flex-direction: column;

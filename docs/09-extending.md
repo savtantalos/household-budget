@@ -35,6 +35,28 @@ Goal: track one-off purchases separately (a `Purchase` table).
 5. `types.ts`, `api.ts` (`purchases: resource<Purchase>('/purchases')`),
    `useBudget.ts` (fetch it), a new component, and a tab in `App.tsx`.
 
+## 9.2b A worked example: the Investments tab
+
+The Investments tab is recipe 9.2 done for real — copy it file by file for your next
+tab:
+
+| Step | File | What was added |
+| --- | --- | --- |
+| Table | `models.py` | `class Investment(SQLModel, table=True)` |
+| Contract | `schemas.py` | `InvestmentCreate` / `InvestmentUpdate` |
+| API | `main.py` | one `crud_router(prefix="/investments")` entry |
+| Maths | `main.py` + `budget.py` | `/investment-projection` reusing `project_savings()` |
+| Seed | `seed.py` | two example holdings |
+| Types | `types.ts` | `Investment`, `Projection` reused |
+| Client | `api.ts` | `investments: resource<Investment>('/investments')` |
+| Load | `useBudget.ts` | one more entry in the `Promise.all` |
+| UI | `InvestmentsPanel.tsx` | table + add form + chart, copied from `SavingsPanel` |
+| Tab | `App.tsx` | `'Investments'` in `TABS`, one `{tab === ...}` block |
+| Tests | `tests/test_api.py` | CRUD + projection expectations |
+
+For sliders with a typed number box, use `SliderInput` (`components/SliderInput.tsx`)
+instead of a bare `<input type="range">` — it handles clamping and syncing for you.
+
 ## 9.3 Change a rule
 
 Goal: split shared costs by income instead of evenly.
@@ -60,7 +82,6 @@ keeping derived numbers server-side.
 | Month-by-month history instead of one "current" month | New `month` column (or a `BudgetMonth` table) + a month selector in the UI |
 | Actual vs budgeted (import bank CSV) | New `Transaction` table + an upload endpoint + a comparison view |
 | Honour `Transfer.months_remaining` so loans end | `build_summary` + a projection that steps month by month |
-| Mortgage amortisation page | New pure function in `budget.py` + a chart component |
 | Multiple households / login | Auth (FastAPI users + JWT), a `household_id` on every table |
 | Deploy it | Doc 08 §8.6 |
 

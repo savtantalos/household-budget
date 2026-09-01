@@ -56,17 +56,20 @@ Base path: `/api`.
 
 | Method | Path | Body | Returns |
 | --- | --- | --- | --- |
-| GET | `/people` `/incomes` `/expenses` `/transfers` `/savings-plans` `/accounts` | – | array of rows |
+| GET | `/people` `/incomes` `/expenses` `/transfers` `/savings-plans` `/accounts` `/investments` | – | array of rows |
 | POST | same paths | the object without `id` | created row, 201 |
 | PATCH | `<path>/{id}` | any subset of fields | updated row |
 | DELETE | `<path>/{id}` | – | 204 no content |
 | GET | `/summary` | – | totals, per-person breakdown, settlements |
 | GET | `/projection?years=&annual_return_pct=&person_id=` | – | monthly balance points |
 | POST | `/mortgage` | principal, rate, term, overpayments | repayment, term, interest, balance points |
+| GET | `/investment-projection?years=` | – | every stored investment grown at its own return, summed |
+| POST | `/invest-vs-overpay` | mortgage terms, spare monthly cash, expected return | which strategy wins, interest per side, wealth points |
 | GET | `/health` | – | `{"status": "ok"}` |
 
-`/mortgage` is the odd one out: a POST that writes nothing. It is a calculator, and the
-lump-sum list has to travel in a JSON body rather than a query string.
+`/mortgage` and `/invest-vs-overpay` are the odd ones out: POSTs that write nothing.
+They are calculators, and their inputs have to travel in a JSON body rather than a
+query string.
 
 Interactive docs: <http://127.0.0.1:8000/docs> (Swagger UI, generated from the code).
 

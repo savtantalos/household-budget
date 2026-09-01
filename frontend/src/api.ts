@@ -1,7 +1,10 @@
 import type {
   Account,
+  Comparison,
+  ComparisonInput,
   Expense,
   Income,
+  Investment,
   Mortgage,
   MortgageInput,
   Person,
@@ -48,9 +51,17 @@ export const api = {
   transfers: resource<Transfer>('/transfers'),
   savingsPlans: resource<SavingsPlan>('/savings-plans'),
   accounts: resource<Account>('/accounts'),
+  investments: resource<Investment>('/investments'),
   summary: () => request<Summary>('/summary'),
   projection: (years: number, annualReturnPct: number) =>
     request<Projection>(`/projection?years=${years}&annual_return_pct=${annualReturnPct}`),
   mortgage: (input: MortgageInput) =>
     request<Mortgage>('/mortgage', { method: 'POST', body: JSON.stringify(input) }),
+  investmentProjection: (years: number) =>
+    request<Projection>(`/investment-projection?years=${years}`),
+  investVsOverpay: (input: ComparisonInput) =>
+    request<Comparison>('/invest-vs-overpay', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
 }

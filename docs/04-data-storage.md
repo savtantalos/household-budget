@@ -84,6 +84,7 @@ months_remaining                                     institution
 | `transfer` | Recurring money moving *between* the two of you | Georgia → Savvas, "Barclays loan", 778.62 |
 | `savingsplan` | Intended monthly saving per person | Savvas, 2500 |
 | `account` | A balance snapshot for net worth | Savvas, Barclays, 55259, as of today |
+| `investment` | A holding that grows: value, monthly top-up, expected return | Savvas, "Global index fund", 10000, +500/month, 7% |
 
 ### What is *not* stored
 

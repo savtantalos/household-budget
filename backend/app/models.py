@@ -59,6 +59,18 @@ class SavingsPlan(SQLModel, table=True):
     monthly_amount: float
 
 
+class Investment(SQLModel, table=True):
+    """A holding that grows: current value, monthly top-up, expected return."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    person_id: int = Field(foreign_key="person.id", index=True)
+    name: str
+    category: str = "index fund"
+    balance: float = 0.0
+    monthly_contribution: float = 0.0
+    annual_return_pct: float = 5.0
+
+
 class Account(SQLModel, table=True):
     """A point-in-time balance for a savings/investment account."""
 
