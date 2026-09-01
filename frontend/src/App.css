@@ -257,6 +257,19 @@ label.inline {
   color: var(--brand);
 }
 
+.split-mode {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.split-mode-options {
+  display: flex;
+  gap: 8px;
+}
+
 .controls {
   display: flex;
   gap: 32px;

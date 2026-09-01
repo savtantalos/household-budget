@@ -1,5 +1,6 @@
 from app.budget import (
     LumpSum,
+    Settlement,
     build_summary,
     compare_invest_vs_overpay,
     monthly,
@@ -7,7 +8,16 @@ from app.budget import (
     project_savings,
     simulate_mortgage,
 )
-from app.models import Account, Expense, Frequency, Income, Person, SavingsPlan, Transfer
+from app.models import (
+    Account,
+    Expense,
+    Frequency,
+    Income,
+    Person,
+    SavingsPlan,
+    SplitMode,
+    Transfer,
+)
 
 
 def make_household():
@@ -76,6 +86,47 @@ def test_settlement_nets_transfers_against_shared_spend():
     assert settlement.from_person == "Savvas"
     assert settlement.to_person == "Georgia"
     assert settlement.amount == 722.7
+
+
+def test_difference_mode_settles_the_whole_gap():
+    people = [Person(id=1, name="Savvas"), Person(id=2, name="Georgia")]
+    expenses = [
+        Expense(id=1, payer_id=2, label="Mortgage", amount=100, shared=True),
+        Expense(id=2, payer_id=1, label="Bills", amount=50, shared=True),
+    ]
+    summary = build_summary(
+        people=people,
+        incomes=[],
+        expenses=expenses,
+        transfers=[],
+        plans=[],
+        accounts=[],
+        split_mode=SplitMode.difference,
+    )
+
+    savvas, georgia = summary.people
+    assert savvas.fair_share == 100
+    assert georgia.fair_share == 50
+    assert summary.settlements == [Settlement("Savvas", "Georgia", 50.0)]
+
+
+def test_difference_mode_leaves_equal_payers_square():
+    people = [Person(id=1, name="Savvas"), Person(id=2, name="Georgia")]
+    expenses = [
+        Expense(id=1, payer_id=1, label="Bills", amount=80, shared=True),
+        Expense(id=2, payer_id=2, label="Food", amount=80, shared=True),
+    ]
+    summary = build_summary(
+        people=people,
+        incomes=[],
+        expenses=expenses,
+        transfers=[],
+        plans=[],
+        accounts=[],
+        split_mode=SplitMode.difference,
+    )
+
+    assert summary.settlements == []
 
 
 def test_remaining_after_savings():

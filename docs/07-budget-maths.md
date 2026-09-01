@@ -26,13 +26,29 @@ Everything downstream works in £/month.
 
 ## 7.3 Fair share
 
+How much of the shared pot each person should end up carrying. The household picks one
+of two modes on the Dashboard; it is stored in the `setting` table and read by
+`build_summary`.
+
+**`even`** (default) — matching the spreadsheet's "Individual Total House Exp":
+
 ```
 fair_share(person) = shared_expenses / number_of_people
                    = 3,797.35 / 2 = 1,898.675
 ```
 
-Even split, matching the spreadsheet's "Individual Total House Exp". If you later want
-to split *proportionally to income*, this single line is the only thing to change:
+**`difference`** — settle the gap in full instead of halving it:
+
+```
+fair_share(person) = (shared_expenses − paid_shared(person)) / (number_of_people − 1)
+```
+
+With two people that means each carries what the *other* paid in, so the transfer is
+the whole difference between what they each paid. Georgia pays 100 and Savvas 50 →
+Savvas sends Georgia 50 (rather than 25 under an even split).
+
+Both modes still add up to the shared total, so settlements always net to zero. To
+split *proportionally to income* instead, `_fair_share` is the only function to change:
 `share_i = shared_expenses * income_i / total_income`.
 
 ## 7.4 Settlement — who owes who
@@ -184,7 +200,7 @@ Deliberately explicit and easy to change:
 
 | Assumption | Where | Change it to… |
 | --- | --- | --- |
-| Shared costs split evenly | `build_summary`, one line | split by income share |
+| Shared costs split evenly or by full difference | `_fair_share` | split by income share |
 | Yearly items ÷ 12 | `monthly()` | keep as lumps in a due month |
 | Contributions at month end | `project_savings` | month start (annuity-due) |
 | Transfers run forever | `Transfer.months_remaining` is stored but not applied | stop the transfer after N months |
