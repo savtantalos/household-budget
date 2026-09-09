@@ -47,7 +47,7 @@ export default function App() {
       {data && (
         <main>
           {tab === 'Dashboard' && (
-            <Dashboard summary={data.summary} expenses={data.expenses} />
+            <Dashboard summary={data.summary} expenses={data.expenses} onChange={refresh} />
           )}
           {tab === 'Income' && (
             <IncomePanel

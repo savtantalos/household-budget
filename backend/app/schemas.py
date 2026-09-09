@@ -2,7 +2,7 @@ from datetime import date
 
 from sqlmodel import Field, SQLModel
 
-from .models import Frequency
+from .models import Frequency, SplitMode
 
 
 class PersonCreate(SQLModel):
@@ -143,6 +143,15 @@ class SummaryOut(SQLModel):
     net_worth: float
     cash_balance: float
     spend_ratio: float
+    split_mode: SplitMode
+
+
+class SettingsOut(SQLModel):
+    split_mode: SplitMode
+
+
+class SettingsUpdate(SQLModel):
+    split_mode: SplitMode
 
 
 class ProjectionPointOut(SQLModel):

@@ -11,8 +11,9 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { api } from '../api'
 import { money, moneyCompact, moneyTooltip, percent } from '../format'
-import type { Expense, Summary } from '../types'
+import type { Expense, SplitMode, Summary } from '../types'
 
 const CATEGORY_COLOURS = [
   '#2f6fed',
@@ -44,7 +45,28 @@ function Stat({
   )
 }
 
-export function Dashboard({ summary, expenses }: { summary: Summary; expenses: Expense[] }) {
+const SPLIT_MODES: { value: SplitMode; label: string; hint: string }[] = [
+  {
+    value: 'even',
+    label: 'Split evenly',
+    hint: 'Shared costs are halved, and the transfer squares up who paid more than their half.',
+  },
+  {
+    value: 'difference',
+    label: 'Pay the difference',
+    hint: 'Whoever paid less into shared costs sends the other the full difference.',
+  },
+]
+
+export function Dashboard({
+  summary,
+  expenses,
+  onChange,
+}: {
+  summary: Summary
+  expenses: Expense[]
+  onChange: () => void
+}) {
   const byCategory = Object.entries(
     expenses.reduce<Record<string, number>>((acc, expense) => {
       acc[expense.category] = (acc[expense.category] ?? 0) + expense.amount
@@ -90,9 +112,24 @@ export function Dashboard({ summary, expenses }: { summary: Summary; expenses: E
             ))}
           </ul>
         )}
+        <div className="split-mode">
+          <span className="stat-label">Settle shared costs by</span>
+          <div className="split-mode-options">
+            {SPLIT_MODES.map((mode) => (
+              <button
+                key={mode.value}
+                className={mode.value === summary.split_mode ? 'tab active' : 'tab'}
+                onClick={() => void api.updateSettings(mode.value).then(onChange)}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+        </div>
         <p className="muted">
-          Shared costs ({money(summary.shared_expenses)}) are split evenly; personal costs (
-          {money(summary.personal_expenses)}) and person-to-person transfers are netted off.
+          {SPLIT_MODES.find((mode) => mode.value === summary.split_mode)?.hint} Shared costs total{' '}
+          {money(summary.shared_expenses)}; personal costs ({money(summary.personal_expenses)}) and
+          person-to-person transfers are netted off.
         </p>
       </section>
 

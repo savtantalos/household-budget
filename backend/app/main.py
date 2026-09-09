@@ -15,7 +15,16 @@ from .budget import (
 )
 from .crud import crud_router
 from .db import get_session, init_db
-from .models import Account, Expense, Income, Investment, Person, SavingsPlan, Transfer
+from .models import (
+    Account,
+    Expense,
+    Income,
+    Investment,
+    Person,
+    SavingsPlan,
+    Setting,
+    Transfer,
+)
 
 
 @asynccontextmanager
@@ -88,6 +97,34 @@ for router in (
     app.include_router(router, prefix="/api")
 
 
+def _settings(session: Session) -> Setting:
+    """The single settings row, created with defaults on first use."""
+    setting = session.exec(select(Setting)).first()
+    if setting is None:
+        setting = Setting()
+        session.add(setting)
+        session.commit()
+        session.refresh(setting)
+    return setting
+
+
+@app.get("/api/settings", response_model=schemas.SettingsOut, tags=["settings"])
+def get_settings(session: Session = Depends(get_session)) -> schemas.SettingsOut:
+    return schemas.SettingsOut(split_mode=_settings(session).split_mode)
+
+
+@app.patch("/api/settings", response_model=schemas.SettingsOut, tags=["settings"])
+def patch_settings(
+    payload: schemas.SettingsUpdate, session: Session = Depends(get_session)
+) -> schemas.SettingsOut:
+    setting = _settings(session)
+    setting.split_mode = payload.split_mode
+    session.add(setting)
+    session.commit()
+    session.refresh(setting)
+    return schemas.SettingsOut(split_mode=setting.split_mode)
+
+
 @app.get("/api/summary", response_model=schemas.SummaryOut, tags=["summary"])
 def get_summary(session: Session = Depends(get_session)) -> schemas.SummaryOut:
     summary = build_summary(
@@ -97,6 +134,7 @@ def get_summary(session: Session = Depends(get_session)) -> schemas.SummaryOut:
         transfers=list(session.exec(select(Transfer)).all()),
         plans=list(session.exec(select(SavingsPlan)).all()),
         accounts=list(session.exec(select(Account)).all()),
+        split_mode=_settings(session).split_mode,
     )
     return schemas.SummaryOut(
         people=[
@@ -132,6 +170,7 @@ def get_summary(session: Session = Depends(get_session)) -> schemas.SummaryOut:
         net_worth=round(summary.net_worth, 2),
         cash_balance=round(summary.cash_balance, 2),
         spend_ratio=round(summary.spend_ratio, 4),
+        split_mode=summary.split_mode,
     )
 
 

@@ -61,6 +61,8 @@ Base path: `/api`.
 | PATCH | `<path>/{id}` | any subset of fields | updated row |
 | DELETE | `<path>/{id}` | – | 204 no content |
 | GET | `/summary` | – | totals, per-person breakdown, settlements |
+| GET | `/settings` | – | household preferences (`split_mode`) |
+| PATCH | `/settings` | `split_mode`: `even` or `difference` | the saved preferences |
 | GET | `/projection?years=&annual_return_pct=&person_id=` | – | monthly balance points |
 | POST | `/mortgage` | principal, rate, term, overpayments | repayment, term, interest, balance points |
 | GET | `/investment-projection?years=` | – | every stored investment grown at its own return, summed |
@@ -94,12 +96,15 @@ Interactive docs: <http://127.0.0.1:8000/docs> (Swagger UI, generated from the c
   "total_income": 10750.0, "total_expenses": 4203.35,
   "shared_expenses": 3797.35, "personal_expenses": 406.0,
   "total_savings": 3500.0, "net_worth": 88009.0,
-  "cash_balance": 6546.65, "spend_ratio": 0.391
+  "cash_balance": 6546.65, "spend_ratio": 0.391,
+  "split_mode": "even"          // how shared costs are settled
 }
 ```
 
-`/summary` is a pure read: it loads the six tables, hands them to
-`budget.build_summary()`, and rounds the result for display.
+`/summary` is a pure read: it loads the budget tables plus the `split_mode` setting,
+hands them to `budget.build_summary()`, and rounds the result for display. Changing
+`split_mode` therefore changes every fair share, settlement and true cost on the next
+`/summary` call — nothing is recalculated in the browser.
 
 ## 5.5 Dependency injection
 

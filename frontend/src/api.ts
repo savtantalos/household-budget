@@ -10,6 +10,8 @@ import type {
   Person,
   Projection,
   SavingsPlan,
+  Settings,
+  SplitMode,
   Summary,
   Transfer,
 } from './types'
@@ -53,6 +55,12 @@ export const api = {
   accounts: resource<Account>('/accounts'),
   investments: resource<Investment>('/investments'),
   summary: () => request<Summary>('/summary'),
+  settings: () => request<Settings>('/settings'),
+  updateSettings: (splitMode: SplitMode) =>
+    request<Settings>('/settings', {
+      method: 'PATCH',
+      body: JSON.stringify({ split_mode: splitMode }),
+    }),
   projection: (years: number, annualReturnPct: number) =>
     request<Projection>(`/projection?years=${years}&annual_return_pct=${annualReturnPct}`),
   mortgage: (input: MortgageInput) =>
