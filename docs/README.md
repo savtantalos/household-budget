@@ -14,3 +14,4 @@ Start here, in order:
 | [08-local-dev.md](08-local-dev.md) | Running it, tests, lint, troubleshooting |
 | [09-extending.md](09-extending.md) | Recipe for adding a new field, table or page |
 | [10-glossary.md](10-glossary.md) | Jargon: API, REST, CORS, ORM, proxy, migration… |
+| [11-viable-product-plan.md](11-viable-product-plan.md) | Hosting, auth, per-user data, and a rollout plan for a real product |
