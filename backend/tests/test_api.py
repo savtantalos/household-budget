@@ -3,8 +3,10 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine
 from sqlmodel.pool import StaticPool
 
+from app.auth import get_current_user, hash_password
 from app.db import get_session
 from app.main import app
+from app.models import User
 from app.seed import seed
 
 
@@ -16,12 +18,23 @@ def client_fixture():
     SQLModel.metadata.create_all(engine)
 
     with Session(engine) as session:
-        seed(session)
+        test_user = User(
+            email="test@example.com", hashed_password=hash_password("password")
+        )
+        session.add(test_user)
+        session.commit()
+        session.refresh(test_user)
 
-        def override():
+        seed(session, user_id=test_user.id)
+
+        def override_session():
             return session
 
-        app.dependency_overrides[get_session] = override
+        def override_current_user():
+            return test_user
+
+        app.dependency_overrides[get_session] = override_session
+        app.dependency_overrides[get_current_user] = override_current_user
         yield TestClient(app)
         app.dependency_overrides.clear()
 
@@ -42,11 +55,13 @@ def test_seeded_summary(client):
 
 
 def test_split_mode_setting_changes_the_settlement(client):
-    assert client.get("/api/settings").json() == {"split_mode": "even"}
+    body = client.get("/api/settings").json()
+    assert body["split_mode"] == "even"
+    assert body["mortgage_principal"] == 300000.0
 
     updated = client.patch("/api/settings", json={"split_mode": "difference"})
     assert updated.status_code == 200
-    assert updated.json() == {"split_mode": "difference"}
+    assert updated.json()["split_mode"] == "difference"
 
     summary = client.get("/api/summary").json()
     savvas, georgia = summary["people"]

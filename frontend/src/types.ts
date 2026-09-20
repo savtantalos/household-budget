@@ -1,5 +1,21 @@
 export type Frequency = 'monthly' | 'yearly' | 'one_off'
 
+export interface Category {
+  id: number
+  user_id: number
+  name: string
+}
+
+export interface User {
+  id: number
+  email: string
+}
+
+export interface AuthToken {
+  access_token: string
+  token_type: string
+}
+
 export interface Person {
   id: number
   name: string
@@ -57,6 +73,7 @@ export interface Investment {
   balance: number
   monthly_contribution: number
   annual_return_pct: number
+  color: string | null
 }
 
 export interface PersonSummary {
@@ -100,6 +117,17 @@ export type SplitMode = 'even' | 'difference'
 
 export interface Settings {
   split_mode: SplitMode
+  mortgage_principal: number
+  mortgage_rate_pct: number
+  mortgage_term_years: number
+  mortgage_overpayment: number
+  mortgage_lump_sums: string
+  invest_principal: number
+  invest_mortgage_rate_pct: number
+  invest_term_years: number
+  invest_monthly_amount: number
+  invest_annual_return_pct: number
+  chart_colors: string
 }
 
 export interface ProjectionPoint {
@@ -109,11 +137,38 @@ export interface ProjectionPoint {
   balance: number
 }
 
+export interface SeriesProjectionPoint {
+  month: number
+  year: number
+  balance: number
+}
+
+export interface SeriesProjection {
+  id: number
+  name: string
+  points: SeriesProjectionPoint[]
+}
+
+export interface InvestmentProjectionPoint {
+  month: number
+  year: number
+  balance: number
+}
+
+export interface InvestmentProjection {
+  id: number
+  name: string
+  points: InvestmentProjectionPoint[]
+}
+
 export interface Projection {
   starting_balance: number
   monthly_contribution: number
   annual_return_pct: number
   points: ProjectionPoint[]
+  investments?: InvestmentProjection[]
+  plans?: SeriesProjection[]
+  accounts?: SeriesProjection[]
 }
 
 export interface LumpSum {

@@ -1,5 +1,7 @@
 import type {
   Account,
+  AuthToken,
+  Category,
   Comparison,
   ComparisonInput,
   Expense,
@@ -11,16 +13,31 @@ import type {
   Projection,
   SavingsPlan,
   Settings,
-  SplitMode,
   Summary,
   Transfer,
+  User,
 } from './types'
 
+function token() {
+  return localStorage.getItem('budget-token')
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+  const t = token()
+  if (t) {
+    headers.Authorization = `Bearer ${t}`
+  }
   const response = await fetch(`/api${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     ...init,
   })
+  if (response.status === 401) {
+    localStorage.removeItem('budget-token')
+    throw new Error('401 Unauthorized: please log in again')
+  }
   if (!response.ok) {
     const detail = await response.text()
     throw new Error(`${response.status} ${response.statusText}: ${detail}`)
@@ -47,6 +64,18 @@ function resource<T>(path: string): Resource<T> {
 }
 
 export const api = {
+  login: (email: string, password: string) =>
+    request<AuthToken>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    }),
+  register: (email: string, password: string) =>
+    request<AuthToken>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    }),
+  me: () => request<User>('/auth/me'),
+  categories: resource<Category>('/categories'),
   people: resource<Person>('/people'),
   incomes: resource<Income>('/incomes'),
   expenses: resource<Expense>('/expenses'),
@@ -56,10 +85,10 @@ export const api = {
   investments: resource<Investment>('/investments'),
   summary: () => request<Summary>('/summary'),
   settings: () => request<Settings>('/settings'),
-  updateSettings: (splitMode: SplitMode) =>
+  updateSettings: (payload: Partial<Settings>) =>
     request<Settings>('/settings', {
       method: 'PATCH',
-      body: JSON.stringify({ split_mode: splitMode }),
+      body: JSON.stringify(payload),
     }),
   projection: (years: number, annualReturnPct: number) =>
     request<Projection>(`/projection?years=${years}&annual_return_pct=${annualReturnPct}`),

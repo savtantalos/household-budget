@@ -119,7 +119,7 @@ export function Dashboard({
               <button
                 key={mode.value}
                 className={mode.value === summary.split_mode ? 'tab active' : 'tab'}
-                onClick={() => void api.updateSettings(mode.value).then(onChange)}
+                onClick={() => void api.updateSettings({ split_mode: mode.value }).then(onChange)}
               >
                 {mode.label}
               </button>

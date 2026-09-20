@@ -5,6 +5,29 @@ from sqlmodel import Field, SQLModel
 from .models import Frequency, SplitMode
 
 
+class UserCreate(SQLModel):
+    email: str = Field(min_length=3, max_length=255)
+    password: str = Field(min_length=6, max_length=255)
+
+
+class UserOut(SQLModel):
+    id: int
+    email: str
+
+
+class Token(SQLModel):
+    access_token: str
+    token_type: str
+
+
+class CategoryCreate(SQLModel):
+    name: str
+
+
+class CategoryUpdate(SQLModel):
+    name: str | None = None
+
+
 class PersonCreate(SQLModel):
     name: str
     colour: str = "#2f6fed"
@@ -84,6 +107,7 @@ class InvestmentCreate(SQLModel):
     balance: float = 0.0
     monthly_contribution: float = 0.0
     annual_return_pct: float = 5.0
+    color: str | None = None
 
 
 class InvestmentUpdate(SQLModel):
@@ -93,6 +117,7 @@ class InvestmentUpdate(SQLModel):
     balance: float | None = None
     monthly_contribution: float | None = None
     annual_return_pct: float | None = None
+    color: str | None = None
 
 
 class AccountCreate(SQLModel):
@@ -148,10 +173,32 @@ class SummaryOut(SQLModel):
 
 class SettingsOut(SQLModel):
     split_mode: SplitMode
+    mortgage_principal: float
+    mortgage_rate_pct: float
+    mortgage_term_years: int
+    mortgage_overpayment: float
+    mortgage_lump_sums: str
+    invest_principal: float
+    invest_mortgage_rate_pct: float
+    invest_term_years: int
+    invest_monthly_amount: float
+    invest_annual_return_pct: float
+    chart_colors: str
 
 
 class SettingsUpdate(SQLModel):
-    split_mode: SplitMode
+    split_mode: SplitMode | None = None
+    mortgage_principal: float | None = None
+    mortgage_rate_pct: float | None = None
+    mortgage_term_years: int | None = None
+    mortgage_overpayment: float | None = None
+    mortgage_lump_sums: str | None = None
+    invest_principal: float | None = None
+    invest_mortgage_rate_pct: float | None = None
+    invest_term_years: int | None = None
+    invest_monthly_amount: float | None = None
+    invest_annual_return_pct: float | None = None
+    chart_colors: str | None = None
 
 
 class ProjectionPointOut(SQLModel):
@@ -161,11 +208,38 @@ class ProjectionPointOut(SQLModel):
     balance: float
 
 
+class InvestmentProjectionPointOut(SQLModel):
+    month: int
+    year: float
+    balance: float
+
+
+class InvestmentProjectionOut(SQLModel):
+    id: int
+    name: str
+    points: list[InvestmentProjectionPointOut]
+
+
+class SeriesProjectionPointOut(SQLModel):
+    month: int
+    year: float
+    balance: float
+
+
+class SeriesProjectionOut(SQLModel):
+    id: int
+    name: str
+    points: list[SeriesProjectionPointOut]
+
+
 class ProjectionOut(SQLModel):
     starting_balance: float
     monthly_contribution: float
     annual_return_pct: float
     points: list[ProjectionPointOut]
+    investments: list[InvestmentProjectionOut] | None = None
+    plans: list[SeriesProjectionOut] | None = None
+    accounts: list[SeriesProjectionOut] | None = None
 
 
 class LumpSumIn(SQLModel):

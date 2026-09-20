@@ -1,6 +1,8 @@
 """Seed the database with the household's current budget.
 
 Run with ``python -m app.seed`` (add ``--reset`` to wipe existing rows first).
+Use ``--user-id`` to seed a specific user's household, or ``--email`` to create
+a new user and seed them.
 """
 
 import argparse
@@ -8,15 +10,18 @@ from datetime import date
 
 from sqlmodel import Session, delete, select
 
+from .auth import hash_password
 from .db import engine, init_db
 from .models import (
     Account,
+    Category,
     Expense,
     Income,
     Investment,
     Person,
     SavingsPlan,
     Transfer,
+    User,
 )
 
 PEOPLE = [("Savvas", "#2f6fed"), ("Georgia", "#e0629b")]
@@ -53,28 +58,76 @@ ACCOUNTS = [
 ]
 
 
-def seed(session: Session, reset: bool = False) -> None:
+def _get_or_create_user(
+    session: Session, user_id: int | None, email: str | None
+) -> User:
+    if user_id is not None:
+        user = session.get(User, user_id)
+        if user is None:
+            raise ValueError(f"User {user_id} does not exist")
+        return user
+
+    if email is not None:
+        existing = session.exec(select(User).where(User.email == email)).first()
+        if existing:
+            return existing
+        user = User(email=email, hashed_password=hash_password("password"))
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        return user
+
+    first = session.exec(select(User)).first()
+    if first is None:
+        first = User(email="user@example.com", hashed_password=hash_password("password"))
+        session.add(first)
+        session.commit()
+        session.refresh(first)
+    return first
+
+
+def seed(
+    session: Session,
+    reset: bool = False,
+    user_id: int | None = None,
+    email: str | None = None,
+) -> None:
+    user = _get_or_create_user(session, user_id, email)
+
     if reset:
-        for model in (Account, Investment, SavingsPlan, Transfer, Expense, Income, Person):
-            session.exec(delete(model))
+        for model in (
+            Account,
+            Investment,
+            SavingsPlan,
+            Transfer,
+            Expense,
+            Income,
+            Person,
+        ):
+            session.exec(delete(model).where(model.user_id == user.id))
         session.commit()
 
-    if session.exec(select(Person)).first() is not None:
+    if session.exec(select(Person).where(Person.user_id == user.id)).first() is not None:
         return
 
     people = {}
     for name, colour in PEOPLE:
-        person = Person(name=name, colour=colour)
+        person = Person(user_id=user.id, name=name, colour=colour)
         session.add(person)
         people[name] = person
     session.commit()
 
     for name, label, amount in INCOMES:
-        session.add(Income(person_id=people[name].id, label=label, amount=amount))
+        session.add(
+            Income(
+                user_id=user.id, person_id=people[name].id, label=label, amount=amount
+            )
+        )
 
     for payer, label, amount, category, shared in EXPENSES:
         session.add(
             Expense(
+                user_id=user.id,
                 payer_id=people[payer].id,
                 label=label,
                 amount=amount,
@@ -86,6 +139,7 @@ def seed(session: Session, reset: bool = False) -> None:
     for sender, receiver, label, amount, months in TRANSFERS:
         session.add(
             Transfer(
+                user_id=user.id,
                 from_person_id=people[sender].id,
                 to_person_id=people[receiver].id,
                 label=label,
@@ -95,11 +149,14 @@ def seed(session: Session, reset: bool = False) -> None:
         )
 
     for name, amount in SAVINGS_PLANS:
-        session.add(SavingsPlan(person_id=people[name].id, monthly_amount=amount))
+        session.add(
+            SavingsPlan(user_id=user.id, person_id=people[name].id, monthly_amount=amount)
+        )
 
     for name, label, category, balance, contribution, return_pct in INVESTMENTS:
         session.add(
             Investment(
+                user_id=user.id,
                 person_id=people[name].id,
                 name=label,
                 category=category,
@@ -112,6 +169,7 @@ def seed(session: Session, reset: bool = False) -> None:
     for name, institution, balance in ACCOUNTS:
         session.add(
             Account(
+                user_id=user.id,
                 person_id=people[name].id,
                 institution=institution,
                 balance=balance,
@@ -121,15 +179,35 @@ def seed(session: Session, reset: bool = False) -> None:
 
     session.commit()
 
+    # Seed categories used by the sample expenses.
+    expense_categories = {category.lower() for _, _, _, category, _ in EXPENSES}
+    existing_categories = {
+        c.name
+        for c in session.exec(
+            select(Category).where(Category.user_id == user.id)
+        ).all()
+    }
+    for category in expense_categories:
+        if category not in existing_categories:
+            session.add(Category(user_id=user.id, name=category))
+    session.commit()
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--reset", action="store_true", help="delete existing rows first")
+    parser.add_argument("--user-id", type=int, help="seed data for this user id")
+    parser.add_argument(
+        "--email",
+        type=str,
+        default="user@example.com",
+        help="create or use this user and seed them (default: user@example.com)",
+    )
     args = parser.parse_args()
 
     init_db()
     with Session(engine) as session:
-        seed(session, reset=args.reset)
+        seed(session, reset=args.reset, user_id=args.user_id, email=args.email)
     print("Seeded budget database.")
 
 

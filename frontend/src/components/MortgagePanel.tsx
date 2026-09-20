@@ -10,8 +10,15 @@ import {
   YAxis,
 } from 'recharts'
 import { api } from '../api'
-import { describeLife, money, moneyCompact, moneyTooltip } from '../format'
-import type { LumpSum, Mortgage } from '../types'
+import {
+  chartColor,
+  describeLife,
+  money,
+  moneyCompact,
+  moneyTooltip,
+  parseChartColors,
+} from '../format'
+import type { LumpSum, Mortgage, Settings } from '../types'
 import { SliderInput } from './SliderInput'
 
 const MAX_CHART_POINTS = 120
@@ -37,6 +44,8 @@ function Stat({
 }
 
 export function MortgagePanel() {
+  const [loaded, setLoaded] = useState(false)
+
   const [principal, setPrincipal] = useState(300000)
   const [ratePct, setRatePct] = useState(4.5)
   const [termYears, setTermYears] = useState(25)
@@ -47,6 +56,25 @@ export function MortgagePanel() {
 
   const [result, setResult] = useState<Mortgage | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [settings, setSettings] = useState<Settings | null>(null)
+
+  useEffect(() => {
+    void api.settings().then((loaded: Settings) => {
+      setSettings(loaded)
+      setPrincipal(loaded.mortgage_principal)
+      setRatePct(loaded.mortgage_rate_pct)
+      setTermYears(loaded.mortgage_term_years)
+      setOverpayment(loaded.mortgage_overpayment)
+      try {
+        setLumpSums(JSON.parse(loaded.mortgage_lump_sums) as LumpSum[])
+      } catch {
+        setLumpSums([])
+      }
+      setLoaded(true)
+    })
+  }, [])
+
+  const colors = parseChartColors(settings)
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -67,6 +95,27 @@ export function MortgagePanel() {
     return () => clearTimeout(timer)
   }, [principal, ratePct, termYears, overpayment, lumpSums])
 
+  useEffect(() => {
+    if (!loaded) return
+    const timer = setTimeout(() => {
+      void api.updateSettings({
+        mortgage_principal: principal,
+        mortgage_rate_pct: ratePct,
+        mortgage_term_years: termYears,
+        mortgage_overpayment: overpayment,
+        mortgage_lump_sums: JSON.stringify(lumpSums),
+      })
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [
+    loaded,
+    principal,
+    ratePct,
+    termYears,
+    overpayment,
+    lumpSums,
+  ])
+
   const chartData = useMemo(() => {
     const points = result?.points ?? []
     const step = Math.max(1, Math.ceil(points.length / MAX_CHART_POINTS))
@@ -74,8 +123,8 @@ export function MortgagePanel() {
       .filter((_, index) => index % step === 0 || index === points.length - 1)
       .map((point) => ({
         year: point.year,
-        'With overpayments': point.balance,
-        'Original plan': point.baseline_balance,
+        actual: point.balance,
+        baseline: point.baseline_balance,
       }))
   }, [result])
 
@@ -241,15 +290,19 @@ export function MortgagePanel() {
                 <Legend />
                 <Area
                   type="monotone"
-                  dataKey="Original plan"
-                  stroke="#8898aa"
-                  fill="#dfe6f5"
+                  dataKey="baseline"
+                  stroke={chartColor('mortgage-baseline', 0, colors)}
+                  fill={chartColor('mortgage-baseline', 0, colors)}
+                  fillOpacity={0.15}
+                  name="Original plan"
                 />
                 <Area
                   type="monotone"
-                  dataKey="With overpayments"
-                  stroke="#2f6fed"
-                  fill="#c9dbff"
+                  dataKey="actual"
+                  stroke={chartColor('mortgage-actual', 0, colors)}
+                  fill={chartColor('mortgage-actual', 0, colors)}
+                  fillOpacity={0.25}
+                  name="With overpayments"
                 />
               </AreaChart>
             </ResponsiveContainer>

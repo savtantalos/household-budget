@@ -4,17 +4,27 @@ import {
   AreaChart,
   CartesianGrid,
   Legend,
+  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
 import { api } from '../api'
-import { describeLife, money, moneyCompact, moneyTooltip } from '../format'
-import type { Comparison, Investment, Person, Projection } from '../types'
+import {
+  chartColor,
+  describeLife,
+  money,
+  moneyCompact,
+  moneyTooltip,
+  parseChartColors,
+} from '../format'
+import type { Comparison, Investment, Person, Projection, Settings } from '../types'
 import { SliderInput } from './SliderInput'
 
 const MAX_CHART_POINTS = 120
+
+const PRESET_COLOURS = ['#2f6fed', '#e0629b', '#28b487', '#f5a623', '#7c5cff']
 
 interface Props {
   investments: Investment[]
@@ -23,6 +33,8 @@ interface Props {
 }
 
 export function InvestmentsPanel({ investments, people, onChange }: Props) {
+  const [loaded, setLoaded] = useState(false)
+
   const [years, setYears] = useState(10)
   const [projection, setProjection] = useState<Projection | null>(null)
 
@@ -32,6 +44,7 @@ export function InvestmentsPanel({ investments, people, onChange }: Props) {
   const [contribution, setContribution] = useState('')
   const [returnPct, setReturnPct] = useState('5')
   const [personId, setPersonId] = useState(people[0]?.id ?? 0)
+  const [colour, setColour] = useState(PRESET_COLOURS[0])
 
   // Invest-vs-overpay comparison inputs
   const [principal, setPrincipal] = useState(300000)
@@ -41,6 +54,22 @@ export function InvestmentsPanel({ investments, people, onChange }: Props) {
   const [investReturn, setInvestReturn] = useState(7)
   const [comparison, setComparison] = useState<Comparison | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const [settings, setSettings] = useState<Settings | null>(null)
+
+  useEffect(() => {
+    void api.settings().then((loaded: Settings) => {
+      setSettings(loaded)
+      setPrincipal(loaded.invest_principal)
+      setMortgageRate(loaded.invest_mortgage_rate_pct)
+      setTermYears(loaded.invest_term_years)
+      setMonthlyAmount(loaded.invest_monthly_amount)
+      setInvestReturn(loaded.invest_annual_return_pct)
+      setLoaded(true)
+    })
+  }, [])
+
+  const colors = parseChartColors(settings)
 
   useEffect(() => {
     void api.investmentProjection(years).then(setProjection)
@@ -65,14 +94,36 @@ export function InvestmentsPanel({ investments, people, onChange }: Props) {
     return () => clearTimeout(timer)
   }, [principal, mortgageRate, termYears, monthlyAmount, investReturn])
 
-  const projectionData =
-    projection?.points
+  useEffect(() => {
+    if (!loaded) return
+    const timer = setTimeout(() => {
+      void api.updateSettings({
+        invest_principal: principal,
+        invest_mortgage_rate_pct: mortgageRate,
+        invest_term_years: termYears,
+        invest_monthly_amount: monthlyAmount,
+        invest_annual_return_pct: investReturn,
+      })
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [loaded, principal, mortgageRate, termYears, monthlyAmount, investReturn])
+
+  const projectionData = useMemo(() => {
+    if (!projection) return []
+    return projection.points
       .filter((point) => point.month % 3 === 0 || point.month === 0)
-      .map((point) => ({
-        year: point.year,
-        'With growth': point.balance,
-        'Contributions only': projection.starting_balance + point.contributed,
-      })) ?? []
+      .map((point) => {
+        const row: Record<string, number> = {
+          year: point.year,
+          total: point.balance,
+          contributions: projection.starting_balance + point.contributed,
+        }
+        projection.investments?.forEach((inv) => {
+          row[`investment-${inv.id}`] = inv.points[point.month]?.balance ?? 0
+        })
+        return row
+      })
+  }, [projection])
 
   const comparisonData = useMemo(() => {
     const points = comparison?.points ?? []
@@ -81,8 +132,8 @@ export function InvestmentsPanel({ investments, people, onChange }: Props) {
       .filter((_, index) => index % step === 0 || index === points.length - 1)
       .map((point) => ({
         year: point.year,
-        Invest: point.invest_wealth,
-        'Overpay mortgage': point.overpay_wealth,
+        invest: point.invest_wealth,
+        overpay: point.overpay_wealth,
       }))
   }, [comparison])
 
@@ -96,10 +147,12 @@ export function InvestmentsPanel({ investments, people, onChange }: Props) {
       balance: Number(balance) || 0,
       monthly_contribution: Number(contribution) || 0,
       annual_return_pct: Number(returnPct) || 0,
+      color: colour,
     })
     setName('')
     setBalance('')
     setContribution('')
+    setColour(PRESET_COLOURS[0])
     await onChange()
   }
 
@@ -132,9 +185,10 @@ export function InvestmentsPanel({ investments, people, onChange }: Props) {
               <th>Person</th>
               <th>Name</th>
               <th>Category</th>
+              <th>Colour</th>
               <th>Value today</th>
               <th>Monthly top-up</th>
-              <th>Expected return %</th>
+              <th>Expected annual return %</th>
               <th />
             </tr>
           </thead>
@@ -146,6 +200,37 @@ export function InvestmentsPanel({ investments, people, onChange }: Props) {
                 </td>
                 <td>{investment.name}</td>
                 <td>{investment.category}</td>
+                <td>
+                  <select
+                    defaultValue={investment.color || PRESET_COLOURS[0]}
+                    onBlur={async (event) => {
+                      const value = event.target.value
+                      if (value !== investment.color) {
+                        await api.investments.update(investment.id, { color: value })
+                        await onChange()
+                      }
+                    }}
+                    style={{ width: 'auto' }}
+                  >
+                    {PRESET_COLOURS.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="color"
+                    defaultValue={investment.color || PRESET_COLOURS[0]}
+                    onBlur={async (event) => {
+                      const value = event.target.value
+                      if (value !== investment.color) {
+                        await api.investments.update(investment.id, { color: value })
+                        await onChange()
+                      }
+                    }}
+                    style={{ width: 60, padding: 2, cursor: 'pointer' }}
+                  />
+                </td>
                 <td>{numberCell(investment, 'balance', '100')}</td>
                 <td>{numberCell(investment, 'monthly_contribution', '10')}</td>
                 <td>{numberCell(investment, 'annual_return_pct', '0.1')}</td>
@@ -165,7 +250,7 @@ export function InvestmentsPanel({ investments, people, onChange }: Props) {
           </tbody>
           <tfoot>
             <tr>
-              <td colSpan={3}>Total</td>
+              <td colSpan={4}>Total</td>
               <td>{money(investments.reduce((sum, inv) => sum + inv.balance, 0))}</td>
               <td>
                 {money(
@@ -199,6 +284,23 @@ export function InvestmentsPanel({ investments, people, onChange }: Props) {
             value={category}
             onChange={(event) => setCategory(event.target.value)}
           />
+          <select
+            value={colour}
+            onChange={(event) => setColour(event.target.value)}
+            style={{ width: 'auto' }}
+          >
+            {PRESET_COLOURS.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          <input
+            type="color"
+            value={colour}
+            onChange={(event) => setColour(event.target.value)}
+            style={{ width: 60, padding: 2, cursor: 'pointer' }}
+          />
           <input
             type="number"
             step="100"
@@ -216,7 +318,7 @@ export function InvestmentsPanel({ investments, people, onChange }: Props) {
           <input
             type="number"
             step="0.1"
-            placeholder="Return %"
+            placeholder="Annual return %"
             value={returnPct}
             onChange={(event) => setReturnPct(event.target.value)}
           />
@@ -232,8 +334,8 @@ export function InvestmentsPanel({ investments, people, onChange }: Props) {
         {projection && projection.points.length > 0 && (
           <p className="muted">
             {money(projection.starting_balance)} today plus{' '}
-            {money(projection.monthly_contribution)}/month, each holding at its own
-            return →{' '}
+            {money(projection.monthly_contribution)}/month, each holding growing at its own
+            annual rate →{' '}
             <strong>
               {money(projection.points[projection.points.length - 1].balance)}
             </strong>{' '}
@@ -249,11 +351,37 @@ export function InvestmentsPanel({ investments, people, onChange }: Props) {
             <Legend />
             <Area
               type="monotone"
-              dataKey="Contributions only"
-              stroke="#8898aa"
-              fill="#dfe6f5"
+              dataKey="contributions"
+              stroke={chartColor('investment-contributions', 0, colors)}
+              fill={chartColor('investment-contributions', 0, colors)}
+              fillOpacity={0.15}
+              name="Contributions only"
             />
-            <Area type="monotone" dataKey="With growth" stroke="#28b487" fill="#bff0dd" />
+            <Area
+              type="monotone"
+              dataKey="total"
+              stroke={chartColor('investment-total', 0, colors)}
+              fill={chartColor('investment-total', 0, colors)}
+              fillOpacity={0.25}
+              name="Total"
+            />
+            {projection?.investments?.map((inv, index) => {
+              const holding = investments.find((i) => i.id === inv.id)
+              return (
+                <Line
+                  key={inv.id}
+                  type="monotone"
+                  dataKey={`investment-${inv.id}`}
+                  name={inv.name}
+                  stroke={
+                    holding?.color ||
+                    chartColor(`investment-${inv.id}`, index, colors)
+                  }
+                  strokeWidth={2}
+                  dot={false}
+                />
+              )
+            })}
           </AreaChart>
         </ResponsiveContainer>
       </section>
@@ -302,7 +430,7 @@ export function InvestmentsPanel({ investments, people, onChange }: Props) {
             format={money}
           />
           <SliderInput
-            label="Investment return"
+            label="Investment return (annual %)"
             value={investReturn}
             onChange={setInvestReturn}
             min={0}
@@ -364,12 +492,21 @@ export function InvestmentsPanel({ investments, people, onChange }: Props) {
                 <YAxis tickFormatter={moneyCompact} width={70} />
                 <Tooltip formatter={moneyTooltip} />
                 <Legend />
-                <Area type="monotone" dataKey="Invest" stroke="#28b487" fill="#bff0dd" />
                 <Area
                   type="monotone"
-                  dataKey="Overpay mortgage"
-                  stroke="#2f6fed"
-                  fill="#c9dbff"
+                  dataKey="invest"
+                  stroke={chartColor('invest-vs-overpay-invest', 0, colors)}
+                  fill={chartColor('invest-vs-overpay-invest', 0, colors)}
+                  fillOpacity={0.25}
+                  name="Invest"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="overpay"
+                  stroke={chartColor('invest-vs-overpay-overpay', 0, colors)}
+                  fill={chartColor('invest-vs-overpay-overpay', 0, colors)}
+                  fillOpacity={0.25}
+                  name="Overpay mortgage"
                 />
               </AreaChart>
             </ResponsiveContainer>

@@ -8,9 +8,11 @@ description: How to run and browser-test the household budget app (FastAPI + Rea
 ## Running it
 - Backend: `cd backend && .venv/bin/uvicorn app.main:app --port 8000` (SQLite at `backend/budget.db`).
 - Frontend: `cd frontend && npm run dev` → http://localhost:5173, proxies `/api` to :8000.
-- No auth. Re-seed with `cd backend && .venv/bin/python -m app.seed --reset` if data drifts.
+- The app now requires login. A default seeded account is `user@example.com` / `password`. New accounts can be created on the login screen.
+- Re-seed the default account with `cd backend && .venv/bin/python -m app.seed --reset --email user@example.com` if data drifts.
 - Check both are up before opening the browser: `curl -s localhost:8000/api/health` and `curl -o /dev/null -w '%{http_code}' localhost:5173/`.
 - Servers may already be running from a previous session; the UI may also be left in a dirty state — press F5 first, since panel inputs (Mortgage sliders/lump sums) are local React state only and reset on reload.
+- API tokens are JWTs stored in `localStorage` under `budget-token`; use it in curl with `-H "Authorization: Bearer <token>"`.
 
 ## Known-good seed values (use as assertions)
 - Dashboard: Monthly income £10,750.00, Monthly expenses £4,203.35, Net worth £88,009.00, settlement "Savvas pays Georgia £722.70".
@@ -26,4 +28,4 @@ description: How to run and browser-test the household budget app (FastAPI + Rea
 - Any non-2xx from the API renders a red "Could not run the simulation." card — its absence is decent evidence there were no 422/500s.
 
 ## Devin Secrets Needed
-None — the app is local and unauthenticated.
+None — the app is local. The default dev account is `user@example.com` / `password`.

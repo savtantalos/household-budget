@@ -76,6 +76,64 @@ button:hover {
   color: #fff;
 }
 
+header {
+  align-items: center;
+}
+
+.user-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+button.primary {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
+button.secondary {
+  background: transparent;
+  color: var(--muted);
+  border-color: transparent;
+  padding: 4px 8px;
+}
+
+button.secondary:hover {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+button.link {
+  background: transparent;
+  border-color: transparent;
+  color: var(--brand);
+  padding: 0;
+}
+
+button.link:hover {
+  text-decoration: underline;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.form-row label {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.form-row input {
+  max-width: none;
+  border-color: var(--border);
+  background: #fff;
+}
+
 button.danger {
   color: var(--negative);
   border-color: transparent;
@@ -178,9 +236,9 @@ input,
 select {
   font: inherit;
   padding: 6px 8px;
-  border: 1px solid transparent;
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: transparent;
+  background: #fff;
   color: inherit;
   width: 100%;
   max-width: 190px;
@@ -188,14 +246,13 @@ select {
 
 input:hover,
 select:hover {
-  border-color: var(--border);
+  border-color: var(--brand);
 }
 
 input:focus,
 select:focus {
   outline: none;
   border-color: var(--brand);
-  background: #fff;
 }
 
 input[type='checkbox'] {

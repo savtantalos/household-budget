@@ -1,17 +1,25 @@
 import { useEffect, useState } from 'react'
+import { useMemo } from 'react'
 import {
   Area,
   AreaChart,
   CartesianGrid,
   Legend,
+  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
 import { api } from '../api'
-import { money, moneyCompact, moneyTooltip } from '../format'
-import type { Account, Person, Projection, SavingsPlan } from '../types'
+import {
+  chartColor,
+  money,
+  moneyCompact,
+  moneyTooltip,
+  parseChartColors,
+} from '../format'
+import type { Account, Person, Projection, SavingsPlan, Settings } from '../types'
 import { SliderInput } from './SliderInput'
 
 interface Props {
@@ -29,10 +37,17 @@ export function SavingsPanel({ savingsPlans, accounts, people, onChange }: Props
   const [institution, setInstitution] = useState('')
   const [balance, setBalance] = useState('')
   const [accountPersonId, setAccountPersonId] = useState(people[0]?.id ?? 0)
+  const [settings, setSettings] = useState<Settings | null>(null)
+
+  useEffect(() => {
+    void api.settings().then(setSettings)
+  }, [])
 
   useEffect(() => {
     void api.projection(years, returnPct).then(setProjection)
   }, [years, returnPct, savingsPlans, accounts])
+
+  const colors = parseChartColors(settings)
 
   const addAccount = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -47,14 +62,25 @@ export function SavingsPanel({ savingsPlans, accounts, people, onChange }: Props
     await onChange()
   }
 
-  const chartData =
-    projection?.points
+  const chartData = useMemo(() => {
+    if (!projection) return []
+    return projection.points
       .filter((point) => point.month % 3 === 0 || point.month === 0)
-      .map((point) => ({
-        year: point.year,
-        Balance: point.balance,
-        Contributed: projection.starting_balance + point.contributed,
-      })) ?? []
+      .map((point) => {
+        const row: Record<string, number> = {
+          year: point.year,
+          total: point.balance,
+          contributed: projection.starting_balance + point.contributed,
+        }
+        projection.plans?.forEach((plan) => {
+          row[`plan-${plan.id}`] = plan.points[point.month]?.balance ?? 0
+        })
+        projection.accounts?.forEach((account) => {
+          row[`account-${account.id}`] = account.points[point.month]?.balance ?? 0
+        })
+        return row
+      })
+  }, [projection])
 
   return (
     <div className="stack">
@@ -205,18 +231,42 @@ export function SavingsPanel({ savingsPlans, accounts, people, onChange }: Props
             <Legend />
             <Area
               type="monotone"
-              dataKey="Contributed"
-              stroke="#8898aa"
-              fill="#dfe6f5"
+              dataKey="contributed"
+              stroke={chartColor('savings-contributions', 0, colors)}
+              fill={chartColor('savings-contributions', 0, colors)}
+              fillOpacity={0.15}
               name="Contributions only"
             />
             <Area
               type="monotone"
-              dataKey="Balance"
-              stroke="#28b487"
-              fill="#bff0dd"
-              name="With growth"
+              dataKey="total"
+              stroke={chartColor('savings-total', 0, colors)}
+              fill={chartColor('savings-total', 0, colors)}
+              fillOpacity={0.25}
+              name="Total"
             />
+            {projection?.plans?.map((plan, index) => (
+              <Line
+                key={plan.id}
+                type="monotone"
+                dataKey={`plan-${plan.id}`}
+                name={plan.name}
+                stroke={chartColor(`plan-${plan.id}`, index, colors)}
+                strokeWidth={2}
+                dot={false}
+              />
+            ))}
+            {projection?.accounts?.map((account, index) => (
+              <Line
+                key={account.id}
+                type="monotone"
+                dataKey={`account-${account.id}`}
+                name={account.name}
+                stroke={chartColor(`account-${account.id}`, index, colors)}
+                strokeWidth={2}
+                dot={false}
+              />
+            ))}
           </AreaChart>
         </ResponsiveContainer>
       </section>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from './api'
 import type {
   Account,
+  Category,
   Expense,
   Income,
   Investment,
@@ -13,6 +14,7 @@ import type {
 
 export interface BudgetData {
   people: Person[]
+  categories: Category[]
   incomes: Income[]
   expenses: Expense[]
   transfers: Transfer[]
@@ -31,6 +33,7 @@ export function useBudget() {
     try {
       const [
         people,
+        categories,
         incomes,
         expenses,
         transfers,
@@ -40,6 +43,7 @@ export function useBudget() {
         summary,
       ] = await Promise.all([
         api.people.list(),
+        api.categories.list(),
         api.incomes.list(),
         api.expenses.list(),
         api.transfers.list(),
@@ -50,6 +54,7 @@ export function useBudget() {
       ])
       setData({
         people,
+        categories,
         incomes,
         expenses,
         transfers,

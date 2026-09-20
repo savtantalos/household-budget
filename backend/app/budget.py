@@ -341,8 +341,10 @@ def compare_invest_vs_overpay(
     *Invest*: pay the scheduled mortgage and put ``monthly_amount`` into
     investments returning ``annual_return_pct``. *Overpay*: put it into the
     mortgage instead; once the mortgage clears, invest the freed-up repayment
-    plus the spare cash for the rest of the term. Wealth here means the
-    investment pot only — the house is the same in both scenarios.
+    plus the spare cash for the rest of the term.
+
+    The comparison is the final investment pot, because the total monthly
+    outlay is identical in both cases and the house is the same.
     """
     payment = mortgage_payment(principal, annual_rate_pct, term_years)
     monthly_rate = annual_rate_pct / 100 / MONTHS_PER_YEAR
@@ -372,11 +374,8 @@ def compare_invest_vs_overpay(
 
     invest_interest = sum(interest for _, _, interest in baseline)
     overpay_interest = sum(interest for _, _, interest in overpaid)
-    # Interest is money gone, so it counts against each strategy's final pot.
-    invest_net = invest_pot - invest_interest
-    overpay_net = overpay_pot - overpay_interest
-    advantage = abs(invest_net - overpay_net)
-    winner = "invest" if invest_net > overpay_net else "overpay"
+    advantage = abs(invest_pot - overpay_pot)
+    winner = "invest" if invest_pot > overpay_pot else "overpay"
     return ComparisonResult(
         monthly_payment=round(payment, 2),
         invest_final_pot=round(invest_pot, 2),
