@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
+from langchain_core.language_models import BaseChatModel
 from sqlmodel import Session, delete, select
 
 from . import schemas
@@ -19,11 +20,14 @@ from .budget import (
     project_savings,
     simulate_mortgage,
 )
+from .chat import ask, get_chat_model
 from .crud import crud_router
 from .db import get_session, init_db
 from .models import (
     Account,
     Category,
+    ChatMessage,
+    ChatRole,
     Expense,
     Income,
     Investment,
@@ -570,6 +574,60 @@ def post_invest_vs_overpay(
             for p in result.points
         ],
     )
+
+
+def _chat_history(session: Session, user: User) -> list[ChatMessage]:
+    return list(
+        session.exec(
+            select(ChatMessage).where(ChatMessage.user_id == user.id).order_by(ChatMessage.id)
+        ).all()
+    )
+
+
+@app.get("/api/chat", response_model=list[schemas.ChatMessageOut], tags=["chat"])
+def get_chat(
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> list[ChatMessage]:
+    return _chat_history(session, user)
+
+
+@app.post("/api/chat", response_model=list[schemas.ChatMessageOut], tags=["chat"])
+def post_chat(
+    payload: schemas.ChatIn,
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+    llm: BaseChatModel = Depends(get_chat_model),
+) -> list[ChatMessage]:
+    """Ask the AI a question about this household's budget; returns the new pair."""
+    question = payload.message.strip()
+    if not question:
+        raise HTTPException(status_code=422, detail="Message is empty")
+    try:
+        reply = ask(llm, get_summary(session, user), _chat_history(session, user), question)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"The AI provider returned an error: {exc}",
+        ) from exc
+    messages = [
+        ChatMessage(user_id=user.id, role=ChatRole.human, content=question),
+        ChatMessage(user_id=user.id, role=ChatRole.ai, content=reply),
+    ]
+    session.add_all(messages)
+    session.commit()
+    for message in messages:
+        session.refresh(message)
+    return messages
+
+
+@app.delete("/api/chat", status_code=204, tags=["chat"])
+def delete_chat(
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+) -> None:
+    session.exec(delete(ChatMessage).where(ChatMessage.user_id == user.id))
+    session.commit()
 
 
 @app.get("/api/health", tags=["meta"])

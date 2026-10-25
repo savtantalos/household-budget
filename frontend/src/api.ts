@@ -2,6 +2,7 @@ import type {
   Account,
   AuthToken,
   Category,
+  ChatMessage,
   Comparison,
   ComparisonInput,
   Expense,
@@ -96,6 +97,10 @@ export const api = {
     request<Mortgage>('/mortgage', { method: 'POST', body: JSON.stringify(input) }),
   investmentProjection: (years: number) =>
     request<Projection>(`/investment-projection?years=${years}`),
+  chatHistory: () => request<ChatMessage[]>('/chat'),
+  sendChat: (message: string) =>
+    request<ChatMessage[]>('/chat', { method: 'POST', body: JSON.stringify({ message }) }),
+  clearChat: () => request<void>('/chat', { method: 'DELETE' }),
   investVsOverpay: (input: ComparisonInput) =>
     request<Comparison>('/invest-vs-overpay', {
       method: 'POST',

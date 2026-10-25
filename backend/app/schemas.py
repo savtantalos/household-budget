@@ -1,8 +1,8 @@
-from datetime import date
+from datetime import date, datetime
 
 from sqlmodel import Field, SQLModel
 
-from .models import Frequency, SplitMode
+from .models import ChatRole, Frequency, SplitMode
 
 
 class UserCreate(SQLModel):
@@ -301,3 +301,14 @@ class InvestVsOverpayOut(SQLModel):
     winner: str
     advantage: float
     points: list[InvestVsOverpayPointOut]
+
+
+class ChatIn(SQLModel):
+    message: str = Field(min_length=1, max_length=4000)
+
+
+class ChatMessageOut(SQLModel):
+    id: int
+    role: ChatRole
+    content: str
+    created_at: datetime

@@ -231,3 +231,12 @@ export interface Comparison {
   advantage: number
   points: ComparisonPoint[]
 }
+
+export type ChatRole = 'human' | 'ai'
+
+export interface ChatMessage {
+  id: number
+  role: ChatRole
+  content: string
+  created_at: string
+}

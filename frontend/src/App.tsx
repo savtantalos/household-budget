@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { AuthProvider, useAuth } from './AuthContext'
 import './App.css'
 import { AuthPanel } from './components/AuthPanel'
+import { ChatPanel } from './components/ChatPanel'
 import { Dashboard } from './components/Dashboard'
 import { ExpensesPanel } from './components/ExpensesPanel'
 import { IncomePanel } from './components/IncomePanel'
@@ -21,6 +22,7 @@ const TABS = [
   'Investments',
   'Mortgage',
   'Colours',
+  'Chat',
 ] as const
 type Tab = (typeof TABS)[number]
 
@@ -108,6 +110,7 @@ function BudgetApp() {
               accounts={data.accounts}
             />
           )}
+          {tab === 'Chat' && <ChatPanel />}
         </main>
       )}
     </div>
