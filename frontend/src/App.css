@@ -432,3 +432,10 @@ label.inline {
   max-width: none;
   flex: 1;
 }
+
+.chat-suggestions button {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  padding: 8px 14px;
+}
