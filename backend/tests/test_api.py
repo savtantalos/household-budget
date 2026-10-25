@@ -273,3 +273,5 @@ def test_chat_prompt_contains_the_household_numbers(client):
     context = budget_context(SummaryOut(**client.get("/api/summary").json()))
     assert "Total income: £10,750.00" in context
     assert "Settlement: Savvas pays Georgia £722.70" in context
+    assert "before savings: £6,546.65" in context
+    assert "after expenses and savings: £3,046.65" in context

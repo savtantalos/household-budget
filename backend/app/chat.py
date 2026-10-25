@@ -58,7 +58,9 @@ def budget_context(summary: SummaryOut) -> str:
         f"(shared £{summary.shared_expenses:,.2f}, "
         f"personal £{summary.personal_expenses:,.2f})",
         f"- Total savings plans: £{summary.total_savings:,.2f}",
-        f"- Left over after expenses and savings: £{summary.cash_balance:,.2f}",
+        f"- Left over after expenses, before savings: £{summary.cash_balance:,.2f}",
+        f"- Left over after expenses and savings: "
+        f"£{summary.cash_balance - summary.total_savings:,.2f}",
         f"- Net worth (account balances): £{summary.net_worth:,.2f}",
         f"- Shared-cost split mode: {summary.split_mode.value}",
     ]
