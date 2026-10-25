@@ -358,3 +358,84 @@ label.inline {
   color: var(--muted);
   min-width: 220px;
 }
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.chat-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.chat-head h2 {
+  margin: 0;
+}
+
+.chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 240px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.chat-msg {
+  max-width: 75%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  white-space: pre-wrap;
+  line-height: 1.45;
+  font-size: 14px;
+}
+
+.chat-msg.human {
+  align-self: flex-end;
+  background: var(--brand);
+  color: #fff;
+}
+
+.chat-msg.ai {
+  align-self: flex-start;
+  background: #f7f9ff;
+  border: 1px solid var(--border);
+}
+
+.chat-msg.ai.muted {
+  margin: 0;
+}
+
+.chat-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: auto 0;
+}
+
+.chat-error {
+  margin: 0;
+  font-size: 14px;
+}
+
+.chat-input {
+  display: flex;
+  gap: 10px;
+}
+
+.chat-input input {
+  max-width: none;
+  flex: 1;
+}
+
+.chat-suggestions button {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  padding: 8px 14px;
+}

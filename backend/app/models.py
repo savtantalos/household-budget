@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timezone
 from enum import Enum
 
 from sqlmodel import Field, SQLModel
@@ -131,3 +131,18 @@ class Account(SQLModel, table=True):
     institution: str
     balance: float
     as_of: date = Field(default_factory=date.today)
+
+
+class ChatRole(str, Enum):
+    human = "human"
+    ai = "ai"
+
+
+class ChatMessage(SQLModel, table=True):
+    """One message in a user's AI chat; the history is re-sent to the model each turn."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    role: ChatRole
+    content: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

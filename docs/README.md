@@ -16,3 +16,4 @@ Start here, in order:
 | [10-glossary.md](10-glossary.md) | Jargon: API, REST, CORS, ORM, proxy, migration… |
 | [11-viable-product-plan.md](11-viable-product-plan.md) | Hosting, auth, per-user data, and a rollout plan for a real product |
 || [12-deployment-options-and-costs.md](12-deployment-options-and-costs.md) | Hosting, database, auth, domain and email options with current pricing |
+| [13-ai-chat.md](13-ai-chat.md) | The AI chat tab: LangChain + Claude, API key setup, where chat data lives |

@@ -210,3 +210,68 @@ def test_invest_vs_overpay_rejects_zero_monthly_amount(client):
         },
     )
     assert response.status_code == 422
+
+
+def _use_fake_model(responses):
+    from langchain_core.language_models.fake_chat_models import FakeListChatModel
+
+    from app.chat import get_chat_model
+
+    app.dependency_overrides[get_chat_model] = lambda: FakeListChatModel(responses=responses)
+
+
+def test_chat_saves_question_and_reply(client):
+    _use_fake_model(["Yes, you have £6,546.65 left over."])
+    assert client.get("/api/chat").json() == []
+
+    response = client.post("/api/chat", json={"message": "  Can we afford a holiday?  "})
+    assert response.status_code == 200
+    new = response.json()
+    assert [(m["role"], m["content"]) for m in new] == [
+        ("human", "Can we afford a holiday?"),
+        ("ai", "Yes, you have £6,546.65 left over."),
+    ]
+    assert client.get("/api/chat").json() == new
+
+    assert client.delete("/api/chat").status_code == 204
+    assert client.get("/api/chat").json() == []
+
+
+def test_chat_rejects_an_empty_message(client):
+    _use_fake_model(["unused"])
+    assert client.post("/api/chat", json={"message": "   "}).status_code == 422
+    assert client.post("/api/chat", json={"message": ""}).status_code == 422
+
+
+def test_chat_without_api_key_explains_setup(client, monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    response = client.post("/api/chat", json={"message": "hello"})
+    assert response.status_code == 503
+    assert "ANTHROPIC_API_KEY" in response.json()["detail"]
+    assert client.get("/api/chat").json() == []
+
+
+def test_chat_provider_error_is_reported_and_not_saved(client):
+    from langchain_core.runnables import RunnableLambda
+
+    from app.chat import get_chat_model
+
+    def boom(_):
+        raise RuntimeError("rate limited")
+
+    app.dependency_overrides[get_chat_model] = lambda: RunnableLambda(boom)
+    response = client.post("/api/chat", json={"message": "hello"})
+    assert response.status_code == 502
+    assert "rate limited" in response.json()["detail"]
+    assert client.get("/api/chat").json() == []
+
+
+def test_chat_prompt_contains_the_household_numbers(client):
+    from app.chat import budget_context
+    from app.schemas import SummaryOut
+
+    context = budget_context(SummaryOut(**client.get("/api/summary").json()))
+    assert "Total income: £10,750.00" in context
+    assert "Settlement: Savvas pays Georgia £722.70" in context
+    assert "before savings: £6,546.65" in context
+    assert "after expenses and savings: £3,046.65" in context
