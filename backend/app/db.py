@@ -107,6 +107,11 @@ def _ensure_setting_columns() -> None:
 
     existing = {c["name"] for c in inspector.get_columns("setting")}
     columns_to_add = [
+        ("savings_years", "INTEGER DEFAULT 5"),
+        ("savings_annual_return_pct", "REAL DEFAULT 5"),
+        ("investment_projection_years", "INTEGER DEFAULT 10"),
+        ("mortgage_lump_month", "TEXT DEFAULT '12'"),
+        ("mortgage_lump_amount", "TEXT DEFAULT '10000'"),
         ("mortgage_principal", "REAL DEFAULT 300000"),
         ("mortgage_rate_pct", "REAL DEFAULT 4.5"),
         ("mortgage_term_years", "INTEGER DEFAULT 25"),
@@ -117,6 +122,8 @@ def _ensure_setting_columns() -> None:
         ("invest_term_years", "INTEGER DEFAULT 25"),
         ("invest_monthly_amount", "REAL DEFAULT 500"),
         ("invest_annual_return_pct", "REAL DEFAULT 7"),
+        ("invest_comparison_years", "INTEGER DEFAULT NULL"),
+        ("invest_return_spread_pct", "REAL DEFAULT 3"),
         ("chart_colors", "TEXT DEFAULT '{}'"),
     ]
 

@@ -116,6 +116,11 @@ export interface Summary {
 export type SplitMode = 'even' | 'difference'
 
 export interface Settings {
+  savings_years: number
+  savings_annual_return_pct: number
+  investment_projection_years: number
+  mortgage_lump_month: string
+  mortgage_lump_amount: string
   split_mode: SplitMode
   mortgage_principal: number
   mortgage_rate_pct: number
@@ -127,6 +132,8 @@ export interface Settings {
   invest_term_years: number
   invest_monthly_amount: number
   invest_annual_return_pct: number
+  invest_comparison_years: number | null
+  invest_return_spread_pct: number
   chart_colors: string
 }
 
@@ -211,6 +218,7 @@ export interface ComparisonInput {
   term_years: number
   monthly_amount: number
   annual_return_pct: number
+  comparison_years?: number | null
 }
 
 export interface ComparisonPoint {
@@ -218,16 +226,30 @@ export interface ComparisonPoint {
   year: number
   invest_wealth: number
   overpay_wealth: number
+  invest_net_position: number
+  overpay_net_position: number
 }
 
 export interface Comparison {
   monthly_payment: number
+  comparison_years: number
+  annual_return_pct: number
+  invest_months_to_repay: number
   invest_final_pot: number
   invest_total_interest: number
+  invest_contributed: number
+  invest_growth: number
+  invest_remaining_balance: number
+  invest_net_position: number
   overpay_months_to_repay: number
   overpay_final_pot: number
   overpay_total_interest: number
-  winner: string
+  overpay_contributed: number
+  overpay_growth: number
+  overpay_remaining_balance: number
+  overpay_net_position: number
+  interest_saved: number
+  winner: 'invest' | 'overpay' | 'tie'
   advantage: number
   points: ComparisonPoint[]
 }

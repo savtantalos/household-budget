@@ -1,12 +1,13 @@
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel, create_engine, select, text
 from sqlmodel.pool import StaticPool
 
+from app import db
 from app.auth import get_current_user, hash_password
 from app.db import get_session
 from app.main import app
-from app.models import User
+from app.models import Setting, User
 from app.seed import seed
 
 
@@ -81,6 +82,236 @@ def test_split_mode_setting_changes_the_settlement(client):
 
 def test_settings_rejects_an_unknown_split_mode(client):
     assert client.patch("/api/settings", json={"split_mode": "vibes"}).status_code == 422
+
+
+CHART_DEFAULTS = {
+    "savings_years": 5,
+    "savings_annual_return_pct": 5.0,
+    "investment_projection_years": 10,
+    "mortgage_lump_month": "12",
+    "mortgage_lump_amount": "10000",
+    "invest_comparison_years": None,
+    "invest_return_spread_pct": 3.0,
+}
+
+CHART_INPUTS = {
+    "savings_years": 17,
+    "savings_annual_return_pct": 0.0,
+    "investment_projection_years": 23,
+    "mortgage_lump_month": "36",
+    "mortgage_lump_amount": "12500.50",
+    "mortgage_principal": 245000.0,
+    "mortgage_rate_pct": 0.0,
+    "mortgage_term_years": 20,
+    "mortgage_overpayment": 250.0,
+    "mortgage_lump_sums": '[{"month":12,"amount":10000},{"month":36,"amount":2500.5}]',
+    "invest_principal": 275000.0,
+    "invest_mortgage_rate_pct": 0.0,
+    "invest_term_years": 30,
+    "invest_monthly_amount": 700.0,
+    "invest_annual_return_pct": -2.5,
+    "invest_comparison_years": 12,
+    "invest_return_spread_pct": 4.5,
+    "split_mode": "difference",
+    "chart_colors": '{"savings":"#123456"}',
+}
+
+
+@pytest.fixture
+def settings_client(tmp_path):
+    engine = create_engine(
+        f"sqlite:///{tmp_path / 'settings.db'}",
+        connect_args={"check_same_thread": False},
+    )
+    SQLModel.metadata.create_all(engine)
+
+    def override_session():
+        with Session(engine) as session:
+            yield session
+
+    app.dependency_overrides[get_session] = override_session
+    client = TestClient(app)
+    try:
+        registered = client.post(
+            "/api/auth/register",
+            json={"email": "first@example.com", "password": "password"},
+        )
+        assert registered.status_code == 200
+        client.headers["Authorization"] = f"Bearer {registered.json()['access_token']}"
+        yield client, engine
+    finally:
+        client.close()
+        app.dependency_overrides.clear()
+        engine.dispose()
+
+
+def test_chart_settings_defaults(settings_client):
+    client, _ = settings_client
+    response = client.get("/api/settings")
+    assert response.status_code == 200
+    assert {key: response.json()[key] for key in CHART_DEFAULTS} == CHART_DEFAULTS
+
+
+def test_chart_settings_roundtrip_with_fresh_sessions(settings_client):
+    client, engine = settings_client
+    updated = client.patch("/api/settings", json=CHART_INPUTS)
+    assert updated.status_code == 200
+    assert updated.json() == CHART_INPUTS
+    assert client.get("/api/settings").json() == CHART_INPUTS
+
+    with Session(engine) as session:
+        setting = session.exec(select(Setting)).one()
+        assert {key: getattr(setting, key) for key in CHART_INPUTS} == CHART_INPUTS
+
+
+def test_chart_settings_partial_update_preserves_other_inputs(settings_client):
+    client, _ = settings_client
+    assert client.patch("/api/settings", json=CHART_INPUTS).status_code == 200
+    updates = {"savings_years": 8}
+    response = client.patch("/api/settings", json=updates)
+    assert response.status_code == 200
+    assert response.json() == CHART_INPUTS | updates
+    assert client.get("/api/settings").json() == CHART_INPUTS | updates
+    assert client.patch("/api/settings", json={}).json() == CHART_INPUTS | updates
+
+
+def test_chart_settings_are_isolated_between_users(settings_client):
+    client, _ = settings_client
+    first_headers = dict(client.headers)
+    assert client.patch("/api/settings", json=CHART_INPUTS).status_code == 200
+    registered = client.post(
+        "/api/auth/register",
+        json={"email": "second@example.com", "password": "password"},
+    )
+    assert registered.status_code == 200
+    client.headers["Authorization"] = f"Bearer {registered.json()['access_token']}"
+    second_defaults = client.get("/api/settings").json()
+    assert {key: second_defaults[key] for key in CHART_DEFAULTS} == CHART_DEFAULTS
+    second_inputs = {
+        "savings_years": 2,
+        "savings_annual_return_pct": 9.5,
+        "investment_projection_years": 4,
+        "mortgage_lump_month": "",
+        "mortgage_lump_amount": "0.",
+        "invest_comparison_years": 8,
+        "invest_return_spread_pct": 1.5,
+        "invest_annual_return_pct": -10,
+    }
+    updated = client.patch("/api/settings", json=second_inputs)
+    assert updated.status_code == 200
+    assert updated.json() == second_defaults | second_inputs
+    assert client.get("/api/settings").json() == second_defaults | second_inputs
+    client.headers.update(first_headers)
+    assert client.get("/api/settings").json() == CHART_INPUTS
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("savings_years", 0),
+        ("savings_years", 31),
+        ("savings_years", 1.5),
+        ("savings_annual_return_pct", -0.1),
+        ("savings_annual_return_pct", 12.1),
+        ("investment_projection_years", 0),
+        ("investment_projection_years", 41),
+        ("investment_projection_years", 1.5),
+        ("invest_comparison_years", 0),
+        ("invest_comparison_years", 41),
+        ("invest_comparison_years", 1.5),
+        ("invest_return_spread_pct", -0.1),
+        ("invest_return_spread_pct", 15.1),
+        ("invest_annual_return_pct", -30.1),
+        ("invest_annual_return_pct", 30.1),
+    ],
+)
+def test_chart_settings_reject_out_of_bounds_numbers(client, field, value):
+    before = client.get("/api/settings").json()
+    response = client.patch("/api/settings", json={field: value})
+    assert response.status_code == 422
+    assert client.get("/api/settings").json() == before
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("savings_years", 1),
+        ("savings_years", 30),
+        ("savings_annual_return_pct", 0),
+        ("savings_annual_return_pct", 12),
+        ("investment_projection_years", 1),
+        ("investment_projection_years", 40),
+        ("invest_comparison_years", 1),
+        ("invest_comparison_years", 40),
+        ("invest_return_spread_pct", 0),
+        ("invest_return_spread_pct", 15),
+        ("invest_annual_return_pct", -30),
+        ("invest_annual_return_pct", 30),
+    ],
+)
+def test_chart_settings_accept_number_bounds(client, field, value):
+    response = client.patch("/api/settings", json={field: value})
+    assert response.status_code == 200
+    assert response.json()[field] == value
+    assert client.get("/api/settings").json()[field] == value
+
+
+def test_comparison_horizon_can_reset_to_mortgage_term(settings_client):
+    client, _ = settings_client
+    assert client.patch("/api/settings", json=CHART_INPUTS).status_code == 200
+    reset = {"invest_comparison_years": None}
+    response = client.patch("/api/settings", json=reset)
+    assert response.status_code == 200
+    assert response.json() == CHART_INPUTS | reset
+    assert client.get("/api/settings").json() == CHART_INPUTS | reset
+
+
+def test_chart_settings_migration_preserves_existing_rows(tmp_path, monkeypatch):
+    engine = create_engine(f"sqlite:///{tmp_path / 'legacy.db'}")
+    monkeypatch.setattr(db, "engine", engine)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE TABLE setting (id INTEGER PRIMARY KEY, user_id INTEGER, "
+                "split_mode TEXT, mortgage_principal REAL, mortgage_lump_sums TEXT, "
+                "chart_colors TEXT, invest_term_years INTEGER)"
+            )
+        )
+        connection.execute(
+            text(
+                "INSERT INTO setting VALUES "
+                "(1, 7, 'difference', 245000, :lumps, :colors, 18)"
+            ),
+            {
+                "lumps": CHART_INPUTS["mortgage_lump_sums"],
+                "colors": CHART_INPUTS["chart_colors"],
+            },
+        )
+    db._ensure_setting_columns()
+    with Session(engine) as session:
+        setting = session.exec(select(Setting)).one()
+        assert setting.user_id == 7
+        assert setting.split_mode == "difference"
+        assert setting.mortgage_principal == 245000
+        assert setting.invest_term_years == 18
+        assert setting.mortgage_lump_sums == CHART_INPUTS["mortgage_lump_sums"]
+        assert setting.chart_colors == CHART_INPUTS["chart_colors"]
+        assert {key: getattr(setting, key) for key in CHART_DEFAULTS} == CHART_DEFAULTS
+        setting.savings_years = 18
+        setting.mortgage_lump_month = ""
+        setting.invest_comparison_years = 9
+        setting.invest_return_spread_pct = 6.5
+        session.add(setting)
+        session.commit()
+    db._ensure_setting_columns()
+    with Session(engine) as session:
+        setting = session.exec(select(Setting)).one()
+        assert setting.savings_years == 18
+        assert setting.mortgage_lump_month == ""
+        assert setting.invest_comparison_years == 9
+        assert setting.invest_return_spread_pct == 6.5
+        assert setting.mortgage_lump_sums == CHART_INPUTS["mortgage_lump_sums"]
+    engine.dispose()
 
 
 def test_expense_crud_updates_summary(client):
@@ -191,11 +422,175 @@ def test_invest_vs_overpay_endpoint(client):
     )
     assert response.status_code == 200
     body = response.json()
-    assert body["winner"] in {"invest", "overpay"}
+    assert body["winner"] in {"invest", "overpay", "tie"}
+    assert body["comparison_years"] == 25
+    assert body["annual_return_pct"] == 7
+    assert body["monthly_payment"] == 1667.5
+    assert body["invest_months_to_repay"] == 300
     assert body["overpay_months_to_repay"] < 300
+    assert body["invest_remaining_balance"] == 0
+    assert body["overpay_remaining_balance"] == 0
     assert len(body["points"]) == 301
-    assert body["points"][-1]["invest_wealth"] > 0
-    assert body["points"][-1]["overpay_wealth"] > 0
+    assert body["points"][-1]["invest_wealth"] == body["invest_final_pot"] > 0
+    assert body["points"][-1]["overpay_wealth"] == body["overpay_final_pot"] > 0
+    assert body["invest_net_position"] == body["invest_final_pot"]
+    assert body["overpay_net_position"] == body["overpay_final_pot"]
+    assert body["invest_growth"] == pytest.approx(
+        body["invest_final_pot"] - body["invest_contributed"], abs=0.01
+    )
+    assert body["overpay_growth"] == pytest.approx(
+        body["overpay_final_pot"] - body["overpay_contributed"], abs=0.01
+    )
+    assert body["interest_saved"] == pytest.approx(
+        body["invest_total_interest"] - body["overpay_total_interest"], abs=0.01
+    )
+    explicit = client.post(
+        "/api/invest-vs-overpay",
+        json={
+            "principal": 300000,
+            "annual_rate_pct": 4.5,
+            "term_years": 25,
+            "monthly_amount": 500,
+            "annual_return_pct": 7,
+            "comparison_years": 25,
+        },
+    )
+    assert explicit.status_code == 200
+    assert explicit.json() == body
+
+
+def test_invest_vs_overpay_short_horizon_compares_net_positions(client):
+    response = client.post(
+        "/api/invest-vs-overpay",
+        json={
+            "principal": 300000,
+            "annual_rate_pct": 4.5,
+            "term_years": 25,
+            "monthly_amount": 500,
+            "annual_return_pct": 0,
+            "comparison_years": 5,
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["comparison_years"] == 5
+    assert len(body["points"]) == 61
+    assert body["invest_months_to_repay"] == 300
+    assert body["overpay_months_to_repay"] > 60
+    assert body["invest_remaining_balance"] > body["overpay_remaining_balance"] > 0
+    assert body["invest_final_pot"] == body["invest_contributed"] == 30000
+    assert body["overpay_final_pot"] == body["overpay_contributed"] == 0
+    assert body["invest_growth"] == body["overpay_growth"] == 0
+    assert body["points"][0] == {
+        "month": 0,
+        "year": 0,
+        "invest_wealth": 0,
+        "overpay_wealth": 0,
+        "invest_net_position": -300000,
+        "overpay_net_position": -300000,
+    }
+    for strategy in ("invest", "overpay"):
+        assert body[f"{strategy}_net_position"] == pytest.approx(
+            body[f"{strategy}_final_pot"] - body[f"{strategy}_remaining_balance"],
+            abs=0.01,
+        )
+        assert body["points"][-1][f"{strategy}_net_position"] == body[
+            f"{strategy}_net_position"
+        ]
+        assert body["points"][-1][f"{strategy}_wealth"] == body[
+            f"{strategy}_final_pot"
+        ]
+    assert body["winner"] == "overpay"
+    assert body["advantage"] == pytest.approx(
+        body["overpay_net_position"] - body["invest_net_position"], abs=0.01
+    )
+
+
+@pytest.mark.parametrize("annual_return_pct", [-30, -7, 30])
+def test_invest_vs_overpay_accepts_return_bounds(client, annual_return_pct):
+    response = client.post(
+        "/api/invest-vs-overpay",
+        json={
+            "principal": 300000,
+            "annual_rate_pct": 4.5,
+            "term_years": 25,
+            "monthly_amount": 500,
+            "annual_return_pct": annual_return_pct,
+            "comparison_years": 1,
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["annual_return_pct"] == annual_return_pct
+    assert body["comparison_years"] == 1
+    assert len(body["points"]) == 13
+    if annual_return_pct < 0:
+        assert 0 < body["invest_final_pot"] < body["invest_contributed"]
+        assert body["invest_growth"] < 0
+        assert body["winner"] == "overpay"
+
+
+@pytest.mark.parametrize("comparison_years", [None, 40])
+def test_invest_vs_overpay_accepts_optional_and_max_horizon(client, comparison_years):
+    response = client.post(
+        "/api/invest-vs-overpay",
+        json={
+            "principal": 300000,
+            "annual_rate_pct": 4.5,
+            "term_years": 25,
+            "monthly_amount": 500,
+            "annual_return_pct": 7,
+            "comparison_years": comparison_years,
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["comparison_years"] == (comparison_years or 25)
+    assert len(body["points"]) == (comparison_years or 25) * 12 + 1
+
+
+def test_invest_vs_overpay_reports_tie(client):
+    response = client.post(
+        "/api/invest-vs-overpay",
+        json={
+            "principal": 300000,
+            "annual_rate_pct": 0,
+            "term_years": 25,
+            "monthly_amount": 500,
+            "annual_return_pct": 0,
+            "comparison_years": 5,
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["winner"] == "tie"
+    assert body["advantage"] == 0
+    assert body["invest_net_position"] == body["overpay_net_position"]
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("comparison_years", 0),
+        ("comparison_years", 41),
+        ("comparison_years", 1.5),
+        ("annual_return_pct", -30.1),
+        ("annual_return_pct", 30.1),
+    ],
+)
+def test_invest_vs_overpay_rejects_out_of_bounds_inputs(client, field, value):
+    response = client.post(
+        "/api/invest-vs-overpay",
+        json={
+            "principal": 300000,
+            "annual_rate_pct": 4.5,
+            "term_years": 25,
+            "monthly_amount": 500,
+            "annual_return_pct": 7,
+            field: value,
+        },
+    )
+    assert response.status_code == 422
 
 
 def test_invest_vs_overpay_rejects_zero_monthly_amount(client):

@@ -173,6 +173,11 @@ class SummaryOut(SQLModel):
 
 class SettingsOut(SQLModel):
     split_mode: SplitMode
+    savings_years: int
+    savings_annual_return_pct: float
+    investment_projection_years: int
+    mortgage_lump_month: str
+    mortgage_lump_amount: str
     mortgage_principal: float
     mortgage_rate_pct: float
     mortgage_term_years: int
@@ -183,11 +188,18 @@ class SettingsOut(SQLModel):
     invest_term_years: int
     invest_monthly_amount: float
     invest_annual_return_pct: float
+    invest_comparison_years: int | None
+    invest_return_spread_pct: float
     chart_colors: str
 
 
 class SettingsUpdate(SQLModel):
     split_mode: SplitMode | None = None
+    savings_years: int | None = Field(default=None, ge=1, le=30)
+    savings_annual_return_pct: float | None = Field(default=None, ge=0, le=12)
+    investment_projection_years: int | None = Field(default=None, ge=1, le=40)
+    mortgage_lump_month: str | None = None
+    mortgage_lump_amount: str | None = None
     mortgage_principal: float | None = None
     mortgage_rate_pct: float | None = None
     mortgage_term_years: int | None = None
@@ -197,7 +209,9 @@ class SettingsUpdate(SQLModel):
     invest_mortgage_rate_pct: float | None = None
     invest_term_years: int | None = None
     invest_monthly_amount: float | None = None
-    invest_annual_return_pct: float | None = None
+    invest_annual_return_pct: float | None = Field(default=None, ge=-30, le=30)
+    invest_comparison_years: int | None = Field(default=None, ge=1, le=40)
+    invest_return_spread_pct: float | None = Field(default=None, ge=0, le=15)
     chart_colors: str | None = None
 
 
@@ -281,7 +295,8 @@ class InvestVsOverpayIn(SQLModel):
     annual_rate_pct: float = Field(ge=0, le=25)
     term_years: int = Field(ge=1, le=40)
     monthly_amount: float = Field(gt=0)
-    annual_return_pct: float = Field(ge=0, le=30)
+    annual_return_pct: float = Field(ge=-30, le=30)
+    comparison_years: int | None = Field(default=None, ge=1, le=40)
 
 
 class InvestVsOverpayPointOut(SQLModel):
@@ -289,6 +304,8 @@ class InvestVsOverpayPointOut(SQLModel):
     year: float
     invest_wealth: float
     overpay_wealth: float
+    invest_net_position: float
+    overpay_net_position: float
 
 
 class InvestVsOverpayOut(SQLModel):
@@ -300,6 +317,18 @@ class InvestVsOverpayOut(SQLModel):
     overpay_total_interest: float
     winner: str
     advantage: float
+    comparison_years: int
+    annual_return_pct: float
+    invest_months_to_repay: int
+    invest_contributed: float
+    overpay_contributed: float
+    invest_growth: float
+    overpay_growth: float
+    invest_remaining_balance: float
+    overpay_remaining_balance: float
+    invest_net_position: float
+    overpay_net_position: float
+    interest_saved: float
     points: list[InvestVsOverpayPointOut]
 
 

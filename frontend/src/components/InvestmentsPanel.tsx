@@ -5,6 +5,7 @@ import {
   CartesianGrid,
   Legend,
   Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -30,13 +31,20 @@ interface Props {
   investments: Investment[]
   people: Person[]
   onChange: () => Promise<void>
+  settings: Settings
+  onSettingsChange: (payload: Partial<Settings>) => void
 }
 
-export function InvestmentsPanel({ investments, people, onChange }: Props) {
-  const [loaded, setLoaded] = useState(false)
-
-  const [years, setYears] = useState(10)
+export function InvestmentsPanel({
+  investments,
+  people,
+  onChange,
+  settings,
+  onSettingsChange,
+}: Props) {
+  const years = settings.investment_projection_years
   const [projection, setProjection] = useState<Projection | null>(null)
+  const [projectionError, setProjectionError] = useState<string | null>(null)
 
   const [name, setName] = useState('')
   const [category, setCategory] = useState('index fund')
@@ -47,66 +55,70 @@ export function InvestmentsPanel({ investments, people, onChange }: Props) {
   const [colour, setColour] = useState(PRESET_COLOURS[0])
 
   // Invest-vs-overpay comparison inputs
-  const [principal, setPrincipal] = useState(300000)
-  const [mortgageRate, setMortgageRate] = useState(4.5)
-  const [termYears, setTermYears] = useState(25)
-  const [monthlyAmount, setMonthlyAmount] = useState(500)
-  const [investReturn, setInvestReturn] = useState(7)
-  const [comparison, setComparison] = useState<Comparison | null>(null)
+  const principal = settings.invest_principal
+  const mortgageRate = settings.invest_mortgage_rate_pct
+  const termYears = settings.invest_term_years
+  const monthlyAmount = settings.invest_monthly_amount
+  const investReturn = settings.invest_annual_return_pct
+  const comparisonYears = settings.invest_comparison_years ?? termYears
+  const returnSpread = settings.invest_return_spread_pct
+  const [scenarios, setScenarios] = useState<Comparison[] | null>(null)
+  const comparison = scenarios?.[1] ?? null
   const [error, setError] = useState<string | null>(null)
-
-  const [settings, setSettings] = useState<Settings | null>(null)
-
-  useEffect(() => {
-    void api.settings().then((loaded: Settings) => {
-      setSettings(loaded)
-      setPrincipal(loaded.invest_principal)
-      setMortgageRate(loaded.invest_mortgage_rate_pct)
-      setTermYears(loaded.invest_term_years)
-      setMonthlyAmount(loaded.invest_monthly_amount)
-      setInvestReturn(loaded.invest_annual_return_pct)
-      setLoaded(true)
-    })
-  }, [])
 
   const colors = parseChartColors(settings)
 
   useEffect(() => {
-    void api.investmentProjection(years).then(setProjection)
+    let active = true
+    const timer = setTimeout(() => {
+      void api.investmentProjection(years)
+        .then((value) => {
+          if (!active) return
+          setProjection(value)
+          setProjectionError(null)
+        })
+        .catch((err: Error) => {
+          if (active) setProjectionError(err.message)
+        })
+    }, 200)
+    return () => {
+      active = false
+      clearTimeout(timer)
+    }
   }, [years, investments])
 
   useEffect(() => {
+    let active = true
+    setScenarios(null)
+    setError(null)
     const timer = setTimeout(() => {
-      api
-        .investVsOverpay({
-          principal,
-          annual_rate_pct: mortgageRate,
-          term_years: termYears,
-          monthly_amount: monthlyAmount,
-          annual_return_pct: investReturn,
-        })
-        .then((value) => {
-          setComparison(value)
+      const returns = [
+        Math.max(-30, investReturn - returnSpread),
+        investReturn,
+        Math.min(30, investReturn + returnSpread),
+      ]
+      void Promise.all(returns.map((annualReturn) => api.investVsOverpay({
+        principal,
+        annual_rate_pct: mortgageRate,
+        term_years: termYears,
+        monthly_amount: monthlyAmount,
+        annual_return_pct: annualReturn,
+        comparison_years: comparisonYears,
+      })))
+        .then((values) => {
+          if (!active) return
+          setScenarios(values)
           setError(null)
         })
-        .catch((err: Error) => setError(err.message))
+        .catch((err: Error) => {
+          if (active) setError(err.message)
+        })
     }, 200)
-    return () => clearTimeout(timer)
-  }, [principal, mortgageRate, termYears, monthlyAmount, investReturn])
-
-  useEffect(() => {
-    if (!loaded) return
-    const timer = setTimeout(() => {
-      void api.updateSettings({
-        invest_principal: principal,
-        invest_mortgage_rate_pct: mortgageRate,
-        invest_term_years: termYears,
-        invest_monthly_amount: monthlyAmount,
-        invest_annual_return_pct: investReturn,
-      })
-    }, 500)
-    return () => clearTimeout(timer)
-  }, [loaded, principal, mortgageRate, termYears, monthlyAmount, investReturn])
+    return () => {
+      active = false
+      clearTimeout(timer)
+    }
+  }, [principal, mortgageRate, termYears, monthlyAmount, investReturn, comparisonYears, returnSpread])
 
   const projectionData = useMemo(() => {
     if (!projection) return []
@@ -132,8 +144,8 @@ export function InvestmentsPanel({ investments, people, onChange }: Props) {
       .filter((_, index) => index % step === 0 || index === points.length - 1)
       .map((point) => ({
         year: point.year,
-        invest: point.invest_wealth,
-        overpay: point.overpay_wealth,
+        invest: point.invest_net_position,
+        overpay: point.overpay_net_position,
       }))
   }, [comparison])
 
@@ -329,8 +341,20 @@ export function InvestmentsPanel({ investments, people, onChange }: Props) {
       <section className="card">
         <h2>Growth projection</h2>
         <div className="controls">
-          <SliderInput label="Years" value={years} onChange={setYears} min={1} max={40} />
+          <SliderInput
+            label="Years"
+            value={years}
+            onChange={(value) => onSettingsChange({ investment_projection_years: value })}
+            min={1}
+            max={40}
+          />
         </div>
+        {projectionError && (
+          <div className="error">
+            <strong>Could not run the investment projection.</strong>
+            <p>{projectionError}</p>
+          </div>
+        )}
         {projection && projection.points.length > 0 && (
           <p className="muted">
             {money(projection.starting_balance)} today plus{' '}
@@ -389,33 +413,41 @@ export function InvestmentsPanel({ investments, people, onChange }: Props) {
       <section className="card">
         <h2>Invest or overpay the mortgage?</h2>
         <p className="muted">
-          The same spare cash each month, two strategies: invest it, or overpay the
-          mortgage and invest the freed-up repayment once the mortgage clears. Interest
-          paid counts against each side.
+          The same monthly budget, compared at the same future date. Invest the spare
+          cash, or overpay the mortgage and then invest the freed-up budget, including
+          any unused cash in the payoff month.
         </p>
         <div className="controls">
           <SliderInput
             label="Mortgage owed"
             value={principal}
-            onChange={setPrincipal}
+            onChange={(value) => onSettingsChange({ invest_principal: value })}
             min={25000}
             max={1000000}
             step={5000}
             format={money}
           />
           <SliderInput
-            label="Mortgage rate"
+            label="Mortgage rate (annual, nominal)"
             value={mortgageRate}
-            onChange={setMortgageRate}
+            onChange={(value) => onSettingsChange({ invest_mortgage_rate_pct: value })}
             min={0}
             max={12}
             step={0.05}
             format={(value) => `${value}%`}
           />
           <SliderInput
-            label="Term"
+            label="Remaining mortgage term"
             value={termYears}
-            onChange={setTermYears}
+            onChange={(value) => onSettingsChange({ invest_term_years: value })}
+            min={1}
+            max={40}
+            format={(value) => `${value} years`}
+          />
+          <SliderInput
+            label="Compare after"
+            value={comparisonYears}
+            onChange={(value) => onSettingsChange({ invest_comparison_years: value })}
             min={1}
             max={40}
             format={(value) => `${value} years`}
@@ -423,93 +455,192 @@ export function InvestmentsPanel({ investments, people, onChange }: Props) {
           <SliderInput
             label="Spare cash per month"
             value={monthlyAmount}
-            onChange={setMonthlyAmount}
+            onChange={(value) => onSettingsChange({ invest_monthly_amount: value })}
             min={25}
             max={5000}
             step={25}
             format={money}
           />
           <SliderInput
-            label="Investment return (annual %)"
+            label="Base investment return (annual, after costs)"
             value={investReturn}
-            onChange={setInvestReturn}
-            min={0}
-            max={15}
+            onChange={(value) => onSettingsChange({ invest_annual_return_pct: value })}
+            min={-30}
+            max={30}
             step={0.1}
             format={(value) => `${value}%`}
           />
+          <SliderInput
+            label="Low/high return variation"
+            value={returnSpread}
+            onChange={(value) => onSettingsChange({ invest_return_spread_pct: value })}
+            min={0}
+            max={15}
+            step={0.5}
+            format={(value) => `±${value} percentage points`}
+          />
         </div>
+        <p className="muted">
+          The mortgage term is the time to repay the loan, not the fixed-rate deal length.
+          {settings.invest_comparison_years === null
+            ? ' The comparison currently follows the mortgage term; adjust “Compare after” to set a separate horizon.'
+            : ' The comparison horizon is independent of the mortgage term.'}
+        </p>
+        <details>
+          <summary>Assumptions and limitations</summary>
+          <p className="muted">
+            Investment returns are effective annual rates: enter estimates after fees and
+            applicable taxes. The mortgage rate is divided by 12 for monthly interest.
+            Both rates stay constant; payments and investment contributions occur at month end.
+            All figures are future pounds, not inflation-adjusted.
+          </p>
+          <p className="muted">
+            No early-repayment charges, overpayment limits or future mortgage-rate changes
+            are modelled. Investment returns are uncertain and losses are possible; interest
+            avoided is more predictable at a known mortgage rate. Money paid into the
+            mortgage is generally harder to access than investments.
+          </p>
+        </details>
       </section>
 
       {error && (
-        <div className="card error">
+        <div className="card error" role="alert">
           <strong>Could not run the comparison.</strong>
           <p>{error}</p>
         </div>
       )}
+      {!comparison && !error && <p role="status">Calculating comparison scenarios…</p>}
 
       {comparison && (
         <>
           <section className="stat-grid">
             <div className="stat">
-              <span className="stat-label">Better strategy</span>
-              <span className="stat-value positive">
-                {comparison.winner === 'invest' ? 'Invest' : 'Overpay mortgage'}
-              </span>
-              <span className="stat-hint">
-                ahead by {money(comparison.advantage)} after {termYears} years
-              </span>
-            </div>
-            <div className="stat">
-              <span className="stat-label">Investing: final pot</span>
-              <span className="stat-value">{money(comparison.invest_final_pot)}</span>
-              <span className="stat-hint">
-                {money(comparison.invest_total_interest)} mortgage interest paid
-              </span>
-            </div>
-            <div className="stat">
-              <span className="stat-label">Overpaying: final pot</span>
-              <span className="stat-value">{money(comparison.overpay_final_pot)}</span>
-              <span className="stat-hint">
-                {money(comparison.overpay_total_interest)} mortgage interest paid
-              </span>
-            </div>
-            <div className="stat">
-              <span className="stat-label">Overpaying clears the mortgage in</span>
+              <span className="stat-label">Projected advantage under these assumptions</span>
               <span className="stat-value">
-                {describeLife(comparison.overpay_months_to_repay)}
+                {comparison.winner === 'tie'
+                  ? 'No difference'
+                  : comparison.winner === 'invest' ? 'Invest' : 'Overpay mortgage'}
               </span>
-              <span className="stat-hint">then the repayment is invested too</span>
+              <span className="stat-hint">
+                {money(comparison.advantage)} difference after {comparison.comparison_years} years
+                {' '}at {comparison.annual_return_pct}% investment return
+              </span>
+            </div>
+            <div className="stat">
+              <span className="stat-label">Investing: net financial position</span>
+              <span className="stat-value">{money(comparison.invest_net_position)}</span>
+              <span className="stat-hint">investments minus remaining mortgage</span>
+            </div>
+            <div className="stat">
+              <span className="stat-label">Overpaying: net financial position</span>
+              <span className="stat-value">{money(comparison.overpay_net_position)}</span>
+              <span className="stat-hint">investments minus remaining mortgage</span>
+            </div>
+            <div className="stat">
+              <span className="stat-label">Mortgage interest saved by overpaying</span>
+              <span className="stat-value">{money(comparison.interest_saved)}</span>
+              <span className="stat-hint">
+                over {comparison.comparison_years} years; already included in the net positions
+              </span>
             </div>
           </section>
 
           <section className="card">
-            <h2>Investment pot over time</h2>
+            <h2>Net financial position over time</h2>
+            <p className="muted">
+              Investments minus outstanding mortgage debt, using the base return.
+              Higher is better. The house value is excluded because it is identical
+              in both strategies, so a negative figure does not mean negative total net worth.
+            </p>
             <ResponsiveContainer width="100%" height={340}>
-              <AreaChart data={comparisonData}>
+              <LineChart data={comparisonData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e9f2" />
                 <XAxis dataKey="year" tickFormatter={(value: number) => `${value}y`} />
-                <YAxis tickFormatter={moneyCompact} width={70} />
+                <YAxis tickFormatter={moneyCompact} width={80} domain={['auto', 'auto']} />
                 <Tooltip formatter={moneyTooltip} />
                 <Legend />
-                <Area
+                <Line
                   type="monotone"
                   dataKey="invest"
                   stroke={chartColor('invest-vs-overpay-invest', 0, colors)}
-                  fill={chartColor('invest-vs-overpay-invest', 0, colors)}
-                  fillOpacity={0.25}
+                  strokeWidth={2}
+                  dot={false}
                   name="Invest"
                 />
-                <Area
+                <Line
                   type="monotone"
                   dataKey="overpay"
                   stroke={chartColor('invest-vs-overpay-overpay', 0, colors)}
-                  fill={chartColor('invest-vs-overpay-overpay', 0, colors)}
-                  fillOpacity={0.25}
+                  strokeWidth={2}
+                  strokeDasharray="6 3"
+                  dot={false}
                   name="Overpay mortgage"
                 />
-              </AreaChart>
+              </LineChart>
             </ResponsiveContainer>
+          </section>
+
+          <section className="card">
+            <h2>Base-case breakdown after {comparison.comparison_years} years</h2>
+            <p className="muted">
+              Scheduled mortgage repayment: {money(comparison.monthly_payment)} per month.
+              Both strategies also use the same spare cash each month and invest the
+              full budget after their mortgage clears. Interest savings are not added again.
+            </p>
+            <table>
+              <thead>
+                <tr><th scope="col">Measure</th><th scope="col">Invest</th><th scope="col">Overpay mortgage</th></tr>
+              </thead>
+              <tbody>
+                {([
+                  ['Investment contributions', comparison.invest_contributed, comparison.overpay_contributed],
+                  ['Investment growth / loss', comparison.invest_growth, comparison.overpay_growth],
+                  ['Investment pot', comparison.invest_final_pot, comparison.overpay_final_pot],
+                  ['Remaining mortgage debt', comparison.invest_remaining_balance, comparison.overpay_remaining_balance],
+                  ['Mortgage interest paid', comparison.invest_total_interest, comparison.overpay_total_interest],
+                  ['Net financial position', comparison.invest_net_position, comparison.overpay_net_position],
+                ] as const).map(([label, invest, overpay]) => (
+                  <tr key={label}>
+                    <th scope="row">{label}</th><td>{money(invest)}</td><td>{money(overpay)}</td>
+                  </tr>
+                ))}
+                <tr>
+                  <th scope="row">Mortgage cleared from now</th>
+                  <td>{describeLife(comparison.invest_months_to_repay)}</td>
+                  <td>{describeLife(comparison.overpay_months_to_repay)}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p className="muted">
+              Payoff times assume each strategy continues, even beyond the comparison date.
+            </p>
+          </section>
+
+          <section className="card">
+            <h2>Investment return scenarios</h2>
+            <p className="muted">
+              Low, base and high constant-return assumptions—not predictions or confidence
+              intervals. Low/high rates use your variation and are limited to −30% to 30%.
+              All three use the same mortgage assumptions and comparison date.
+            </p>
+            <div className="stat-grid">
+              {scenarios?.map((scenario, index) => (
+                <div className="stat" key={index}>
+                  <span className="stat-label">
+                    {['Low', 'Base', 'High'][index]}: {Number(scenario.annual_return_pct.toFixed(2))}% annual return
+                  </span>
+                  <span className="stat-value">
+                    {scenario.winner === 'tie'
+                      ? 'No difference'
+                      : scenario.winner === 'invest' ? 'Invest ahead' : 'Overpay ahead'}
+                  </span>
+                  <span className="stat-hint">by {money(scenario.advantage)} after {scenario.comparison_years} years</span>
+                  <p>Invest: {money(scenario.invest_net_position)}</p>
+                  <p>Overpay: {money(scenario.overpay_net_position)}</p>
+                  <span className="stat-hint">net financial positions</span>
+                </div>
+              ))}
+            </div>
           </section>
         </>
       )}

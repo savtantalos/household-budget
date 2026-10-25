@@ -218,9 +218,94 @@ def test_overpay_wins_when_the_mortgage_rate_beats_returns():
 
 
 def test_comparison_frees_up_the_repayment_after_payoff():
-    result = compare_invest_vs_overpay(300_000, 4.5, 25, 1_000, annual_return_pct=4.5)
+    result = compare_invest_vs_overpay(120_000, 0, 10, 300, annual_return_pct=0)
     payoff = result.overpay_months_to_repay
-    assert payoff < 300
-    assert result.points[payoff].overpay_wealth == 0.0
-    assert result.points[payoff + 1].overpay_wealth > 0
-    assert result.points[-1].month == 300
+    assert payoff == 93
+    assert result.points[payoff - 1].overpay_wealth == 0.0
+    assert result.points[payoff].overpay_wealth == 900.0
+    assert result.points[payoff + 1].overpay_wealth == 2200.0
+    assert result.invest_final_pot == result.overpay_final_pot == 36000.0
+    assert result.winner == "tie"
+    assert result.advantage == 0.0
+
+
+def test_comparison_compounds_the_payoff_month_surplus():
+    result = compare_invest_vs_overpay(120_000, 0, 10, 300, annual_return_pct=6)
+    growth = 1.06 ** (1 / 12)
+    expected = 900 * growth ** 27 + sum(1300 * growth ** n for n in range(27))
+    assert result.overpay_final_pot == round(expected, 2)
+
+
+def test_comparison_short_horizon_includes_remaining_debt():
+    result = compare_invest_vs_overpay(120_000, 0, 10, 300, 0, comparison_years=5)
+    assert result.monthly_payment == 1000.0
+    assert result.invest_final_pot == 18000.0
+    assert result.overpay_final_pot == 0.0
+    assert result.invest_remaining_balance == 60000.0
+    assert result.overpay_remaining_balance == 42000.0
+    assert result.invest_net_position == result.overpay_net_position == -42000.0
+    assert result.points[0].invest_net_position == -120000.0
+    assert result.points[0].overpay_net_position == -120000.0
+    assert result.points[-1].month == 60
+    assert result.comparison_years == 5
+    assert result.invest_months_to_repay == 120
+    assert result.overpay_months_to_repay == 93
+    assert result.winner == "tie"
+
+
+def test_comparison_invests_full_budget_after_both_mortgages_clear():
+    result = compare_invest_vs_overpay(120_000, 0, 10, 300, 0, comparison_years=12)
+    assert result.invest_final_pot == result.overpay_final_pot == 67200.0
+    assert result.invest_remaining_balance == result.overpay_remaining_balance == 0.0
+    assert result.points[121].invest_wealth - result.points[120].invest_wealth == 1300.0
+    assert result.points[-1].month == 144
+    assert result.winner == "tie"
+
+
+def test_comparison_equal_effective_rates_tie_at_every_month():
+    effective_return = ((1 + 4.5 / 100 / 12) ** 12 - 1) * 100
+    result = compare_invest_vs_overpay(300_000, 4.5, 25, 500, effective_return)
+    assert result.winner == "tie"
+    assert result.advantage == 0.0
+    for point in result.points:
+        assert point.invest_net_position == point.overpay_net_position
+
+
+def test_comparison_budget_and_breakdown_reconcile_at_short_horizon():
+    principal, rate, term, spare, years = 300_000, 4.5, 25, 500, 5
+    result = compare_invest_vs_overpay(principal, rate, term, spare, 0, years)
+    budget = (mortgage_payment(principal, rate, term) + spare) * years * 12
+    for strategy in ("invest", "overpay"):
+        contributions = getattr(result, f"{strategy}_contributed")
+        interest = getattr(result, f"{strategy}_total_interest")
+        debt = getattr(result, f"{strategy}_remaining_balance")
+        pot = getattr(result, f"{strategy}_final_pot")
+        assert abs(contributions + principal - debt + interest - budget) < 0.02
+        assert getattr(result, f"{strategy}_growth") == 0.0
+        assert abs(getattr(result, f"{strategy}_net_position") - (pot - debt)) < 0.02
+    assert result.interest_saved == round(
+        result.invest_total_interest - result.overpay_total_interest, 2
+    )
+    assert abs(result.advantage - result.interest_saved) < 0.02
+    assert result.winner == "overpay"
+    full_term = compare_invest_vs_overpay(principal, rate, term, spare, 0)
+    assert result.invest_total_interest < full_term.invest_total_interest
+    assert result.overpay_total_interest < full_term.overpay_total_interest
+
+
+def test_comparison_negative_return_reports_losses():
+    result = compare_invest_vs_overpay(120_000, 0, 10, 300, -5)
+    assert result.invest_growth < 0
+    assert result.overpay_growth < 0
+    assert result.winner == "overpay"
+    assert abs(
+        result.invest_final_pot - result.invest_contributed - result.invest_growth
+    ) < 0.02
+
+
+def test_comparison_immediate_payoff_keeps_all_unused_cash():
+    result = compare_invest_vs_overpay(1000, 0, 1, 2000, 0)
+    assert result.overpay_months_to_repay == 1
+    assert result.points[1].overpay_wealth == 1083.33
+    assert result.invest_final_pot == result.overpay_final_pot == 24000.0
+    assert result.winner == "tie"

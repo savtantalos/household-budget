@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { AuthProvider, useAuth } from './AuthContext'
+import { api } from './api'
 import './App.css'
 import { AuthPanel } from './components/AuthPanel'
 import { ChatPanel } from './components/ChatPanel'
@@ -11,6 +12,7 @@ import { InvestmentsPanel } from './components/InvestmentsPanel'
 import { MortgagePanel } from './components/MortgagePanel'
 import { PeoplePanel } from './components/PeoplePanel'
 import { SavingsPanel } from './components/SavingsPanel'
+import { createSettingsStore } from './settingsStore'
 import { useBudget } from './useBudget'
 
 const TABS = [
@@ -30,6 +32,25 @@ function BudgetApp() {
   const { data, error, loading, refresh } = useBudget()
   const { user, logout } = useAuth()
   const [tab, setTab] = useState<Tab>('Dashboard')
+  const [settingsStore] = useState(() => createSettingsStore(api.settings, api.updateSettings))
+  const { settings, status, error: settingsError } = useSyncExternalStore(
+    settingsStore.subscribe,
+    settingsStore.getSnapshot,
+  )
+  const unsaved = settings !== null && (status === 'saving' || status === 'error')
+
+  useEffect(() => {
+    void settingsStore.load()
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      const current = settingsStore.getSnapshot()
+      if (current.settings && (current.status === 'saving' || current.status === 'error')) {
+        event.preventDefault()
+        event.returnValue = ''
+      }
+    }
+    window.addEventListener('beforeunload', beforeUnload)
+    return () => window.removeEventListener('beforeunload', beforeUnload)
+  }, [settingsStore])
 
   return (
     <div className="app">
@@ -51,7 +72,7 @@ function BudgetApp() {
         </nav>
         <div className="user-bar">
           <span className="muted">{user?.email}</span>
-          <button type="button" className="secondary" onClick={logout}>
+          <button type="button" className="secondary" onClick={logout} disabled={unsaved}>
             Log out
           </button>
         </div>
@@ -62,6 +83,16 @@ function BudgetApp() {
         <div className="card error">
           <strong>Could not reach the API.</strong>
           <p>{error}</p>
+        </div>
+      )}
+      {status === 'loading' && <p className="muted">Loading chart settings…</p>}
+      {status === 'saving' && <p className="muted" role="status">Saving chart settings…</p>}
+      {status === 'saved' && <p className="muted" role="status">Chart settings saved.</p>}
+      {settingsError && (
+        <div className="card error" role="alert">
+          <strong>{settings ? 'Chart changes have not been saved.' : 'Could not load chart settings.'}</strong>
+          <p>{settingsError}</p>
+          <button type="button" onClick={() => void settingsStore.retry()}>Retry</button>
         </div>
       )}
 
@@ -87,27 +118,35 @@ function BudgetApp() {
               onChange={refresh}
             />
           )}
-          {tab === 'Savings' && (
+          {tab === 'Savings' && settings && (
             <SavingsPanel
               savingsPlans={data.savingsPlans}
               accounts={data.accounts}
               people={data.people}
               onChange={refresh}
+              settings={settings}
+              onSettingsChange={settingsStore.update}
             />
           )}
-          {tab === 'Investments' && (
+          {tab === 'Investments' && settings && (
             <InvestmentsPanel
               investments={data.investments}
               people={data.people}
               onChange={refresh}
+              settings={settings}
+              onSettingsChange={settingsStore.update}
             />
           )}
-          {tab === 'Mortgage' && <MortgagePanel />}
-          {tab === 'Colours' && (
+          {tab === 'Mortgage' && settings && (
+            <MortgagePanel settings={settings} onSettingsChange={settingsStore.update} />
+          )}
+          {tab === 'Colours' && settings && (
             <ColoursPanel
               investments={data.investments}
               savingsPlans={data.savingsPlans}
               accounts={data.accounts}
+              settings={settings}
+              onSettingsChange={settingsStore.update}
             />
           )}
           {tab === 'Chat' && <ChatPanel />}
@@ -124,7 +163,7 @@ function AppContent() {
     return <p className="muted">Checking session…</p>
   }
 
-  return user ? <BudgetApp /> : <AuthPanel />
+  return user ? <BudgetApp key={user.id} /> : <AuthPanel />
 }
 
 export default function App() {

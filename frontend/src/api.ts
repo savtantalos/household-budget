@@ -90,6 +90,7 @@ export const api = {
     request<Settings>('/settings', {
       method: 'PATCH',
       body: JSON.stringify(payload),
+      keepalive: true,
     }),
   projection: (years: number, annualReturnPct: number) =>
     request<Projection>(`/projection?years=${years}&annual_return_pct=${annualReturnPct}`),

@@ -314,16 +314,30 @@ class ComparisonPoint:
     year: float
     invest_wealth: float
     overpay_wealth: float
+    invest_net_position: float
+    overpay_net_position: float
 
 
 @dataclass
 class ComparisonResult:
     monthly_payment: float
+    comparison_years: int
+    annual_return_pct: float
+    invest_months_to_repay: int
     invest_final_pot: float
     invest_total_interest: float
+    invest_contributed: float
+    invest_growth: float
+    invest_remaining_balance: float
+    invest_net_position: float
     overpay_months_to_repay: int
     overpay_final_pot: float
     overpay_total_interest: float
+    overpay_contributed: float
+    overpay_growth: float
+    overpay_remaining_balance: float
+    overpay_net_position: float
+    interest_saved: float
     winner: str
     advantage: float
     points: list[ComparisonPoint] = field(default_factory=list)
@@ -335,56 +349,88 @@ def compare_invest_vs_overpay(
     term_years: int,
     monthly_amount: float,
     annual_return_pct: float,
+    comparison_years: int | None = None,
 ) -> ComparisonResult:
-    """Same spare cash each month, two strategies, compared over the full term.
+    """Same monthly budget, two strategies, compared at a common horizon.
 
-    *Invest*: pay the scheduled mortgage and put ``monthly_amount`` into
-    investments returning ``annual_return_pct``. *Overpay*: put it into the
-    mortgage instead; once the mortgage clears, invest the freed-up repayment
-    plus the spare cash for the rest of the term.
+    *Invest*: pay the scheduled mortgage and invest the remaining budget.
+    *Overpay*: put the budget into the mortgage until cleared, investing any
+    unused cash in the payoff month and the full budget in subsequent months.
+    Contributions are made after monthly investment growth and mortgage interest.
 
-    The comparison is the final investment pot, because the total monthly
-    outlay is identical in both cases and the house is the same.
+    Compare investments minus remaining debt; the house value is the same.
+    Interest savings are already reflected in these cash flows, not added again.
     """
     payment = mortgage_payment(principal, annual_rate_pct, term_years)
     monthly_rate = annual_rate_pct / 100 / MONTHS_PER_YEAR
     growth = (1 + annual_return_pct / 100) ** (1 / MONTHS_PER_YEAR) - 1
-    horizon = term_years * MONTHS_PER_YEAR
+    comparison_years = term_years if comparison_years is None else comparison_years
+    horizon = comparison_years * MONTHS_PER_YEAR
+    mortgage_months = term_years * MONTHS_PER_YEAR
+    budget = payment + monthly_amount
 
-    baseline = _amortise(principal, monthly_rate, payment, horizon)
-    overpaid = _amortise(principal, monthly_rate, payment, horizon, monthly_amount)
-    overpay_months = len(overpaid)
-
-    invest_pot = 0.0
-    overpay_pot = 0.0
-    points = [ComparisonPoint(0, 0.0, 0.0, 0.0)]
+    baseline = _amortise(principal, monthly_rate, payment, mortgage_months)
+    overpaid = _amortise(principal, monthly_rate, payment, mortgage_months, monthly_amount)
+    invest_balance = overpay_balance = principal
+    invest_pot = overpay_pot = 0.0
+    invest_contributed = overpay_contributed = 0.0
+    invest_interest = overpay_interest = 0.0
+    points = [ComparisonPoint(0, 0.0, 0.0, 0.0, -round(principal, 2), -round(principal, 2))]
     for month in range(1, horizon + 1):
-        invest_pot = invest_pot * (1 + growth) + monthly_amount
-        overpay_pot *= 1 + growth
-        if month > overpay_months:
-            overpay_pot += payment + monthly_amount
+        _, next_invest_balance, invest_charge = (
+            baseline[month - 1] if month <= len(baseline) else (month, 0.0, 0.0)
+        )
+        _, next_overpay_balance, overpay_charge = (
+            overpaid[month - 1] if month <= len(overpaid) else (month, 0.0, 0.0)
+        )
+        invest_deposit = max(
+            0.0, budget - (invest_balance + invest_charge - next_invest_balance)
+        )
+        overpay_deposit = max(
+            0.0, budget - (overpay_balance + overpay_charge - next_overpay_balance)
+        )
+        invest_pot = invest_pot * (1 + growth) + invest_deposit
+        overpay_pot = overpay_pot * (1 + growth) + overpay_deposit
+        invest_contributed += invest_deposit
+        overpay_contributed += overpay_deposit
+        invest_interest += invest_charge
+        overpay_interest += overpay_charge
+        invest_balance = next_invest_balance
+        overpay_balance = next_overpay_balance
         points.append(
             ComparisonPoint(
                 month=month,
                 year=round(month / MONTHS_PER_YEAR, 2),
                 invest_wealth=round(invest_pot, 2),
                 overpay_wealth=round(overpay_pot, 2),
+                invest_net_position=round(invest_pot - invest_balance, 2),
+                overpay_net_position=round(overpay_pot - overpay_balance, 2),
             )
         )
 
-    invest_interest = sum(interest for _, _, interest in baseline)
-    overpay_interest = sum(interest for _, _, interest in overpaid)
-    advantage = abs(invest_pot - overpay_pot)
-    winner = "invest" if invest_pot > overpay_pot else "overpay"
+    difference = round(points[-1].invest_net_position - points[-1].overpay_net_position, 2)
+    winner = "tie" if difference == 0 else "invest" if difference > 0 else "overpay"
     return ComparisonResult(
         monthly_payment=round(payment, 2),
+        comparison_years=comparison_years,
+        annual_return_pct=annual_return_pct,
+        invest_months_to_repay=len(baseline),
         invest_final_pot=round(invest_pot, 2),
         invest_total_interest=round(invest_interest, 2),
-        overpay_months_to_repay=overpay_months,
+        invest_contributed=round(invest_contributed, 2),
+        invest_growth=round(invest_pot - invest_contributed, 2),
+        invest_remaining_balance=round(invest_balance, 2),
+        invest_net_position=points[-1].invest_net_position,
+        overpay_months_to_repay=len(overpaid),
         overpay_final_pot=round(overpay_pot, 2),
         overpay_total_interest=round(overpay_interest, 2),
+        overpay_contributed=round(overpay_contributed, 2),
+        overpay_growth=round(overpay_pot - overpay_contributed, 2),
+        overpay_remaining_balance=round(overpay_balance, 2),
+        overpay_net_position=points[-1].overpay_net_position,
+        interest_saved=round(invest_interest - overpay_interest, 2),
         winner=winner,
-        advantage=round(advantage, 2),
+        advantage=abs(difference),
         points=points,
     )
 

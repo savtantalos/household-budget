@@ -103,6 +103,11 @@ class Setting(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id", index=True)
     split_mode: SplitMode = SplitMode.even
+    savings_years: int = Field(default=5, ge=1, le=30)
+    savings_annual_return_pct: float = Field(default=5.0, ge=0, le=12)
+    investment_projection_years: int = Field(default=10, ge=1, le=40)
+    mortgage_lump_month: str = "12"
+    mortgage_lump_amount: str = "10000"
 
     # Mortgage simulator defaults
     mortgage_principal: float = 300000.0
@@ -117,6 +122,8 @@ class Setting(SQLModel, table=True):
     invest_term_years: int = 25
     invest_monthly_amount: float = 500.0
     invest_annual_return_pct: float = 7.0
+    invest_comparison_years: int | None = None
+    invest_return_spread_pct: float = 3.0
 
     # User-selected chart colours, stored as a JSON map keyed by series id.
     chart_colors: str = "{}"

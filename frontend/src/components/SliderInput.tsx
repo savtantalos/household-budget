@@ -20,11 +20,13 @@ export function SliderInput({ label, value, onChange, min, max, step = 1, format
 
   const commit = (raw: string) => {
     const parsed = Number(raw)
-    if (raw === '' || Number.isNaN(parsed)) {
+    if (raw === '' || !Number.isFinite(parsed)) {
       setText(String(value))
       return
     }
-    onChange(Math.min(max, Math.max(min, parsed)))
+    const next = Math.min(max, Math.max(min, step === 1 ? Math.round(parsed) : parsed))
+    setText(String(next))
+    onChange(next)
   }
 
   return (
@@ -47,7 +49,15 @@ export function SliderInput({ label, value, onChange, min, max, step = 1, format
           max={max}
           step={step}
           value={text}
-          onChange={(event) => setText(event.target.value)}
+          onChange={(event) => {
+            const raw = event.target.value
+            setText(raw)
+            const parsed = Number(raw)
+            if (raw !== '' && Number.isFinite(parsed) && parsed >= min && parsed <= max &&
+              (step !== 1 || Number.isInteger(parsed))) {
+              onChange(parsed)
+            }
+          }}
           onBlur={(event) => commit(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter') commit((event.target as HTMLInputElement).value)

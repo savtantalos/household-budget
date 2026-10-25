@@ -269,6 +269,11 @@ def _settings(session: Session, user_id: int) -> Setting:
 def _settings_out(setting: Setting) -> schemas.SettingsOut:
     return schemas.SettingsOut(
         split_mode=setting.split_mode,
+        savings_years=setting.savings_years,
+        savings_annual_return_pct=setting.savings_annual_return_pct,
+        investment_projection_years=setting.investment_projection_years,
+        mortgage_lump_month=setting.mortgage_lump_month,
+        mortgage_lump_amount=setting.mortgage_lump_amount,
         mortgage_principal=setting.mortgage_principal,
         mortgage_rate_pct=setting.mortgage_rate_pct,
         mortgage_term_years=setting.mortgage_term_years,
@@ -279,6 +284,8 @@ def _settings_out(setting: Setting) -> schemas.SettingsOut:
         invest_term_years=setting.invest_term_years,
         invest_monthly_amount=setting.invest_monthly_amount,
         invest_annual_return_pct=setting.invest_annual_return_pct,
+        invest_comparison_years=setting.invest_comparison_years,
+        invest_return_spread_pct=setting.invest_return_spread_pct,
         chart_colors=setting.chart_colors,
     )
 
@@ -554,6 +561,7 @@ def post_invest_vs_overpay(
         term_years=payload.term_years,
         monthly_amount=payload.monthly_amount,
         annual_return_pct=payload.annual_return_pct,
+        comparison_years=payload.comparison_years,
     )
     return schemas.InvestVsOverpayOut(
         monthly_payment=result.monthly_payment,
@@ -564,12 +572,26 @@ def post_invest_vs_overpay(
         overpay_total_interest=result.overpay_total_interest,
         winner=result.winner,
         advantage=result.advantage,
+        comparison_years=result.comparison_years,
+        annual_return_pct=result.annual_return_pct,
+        invest_months_to_repay=result.invest_months_to_repay,
+        invest_contributed=result.invest_contributed,
+        overpay_contributed=result.overpay_contributed,
+        invest_growth=result.invest_growth,
+        overpay_growth=result.overpay_growth,
+        invest_remaining_balance=result.invest_remaining_balance,
+        overpay_remaining_balance=result.overpay_remaining_balance,
+        invest_net_position=result.invest_net_position,
+        overpay_net_position=result.overpay_net_position,
+        interest_saved=result.interest_saved,
         points=[
             schemas.InvestVsOverpayPointOut(
                 month=p.month,
                 year=p.year,
                 invest_wealth=p.invest_wealth,
                 overpay_wealth=p.overpay_wealth,
+                invest_net_position=p.invest_net_position,
+                overpay_net_position=p.overpay_net_position,
             )
             for p in result.points
         ],

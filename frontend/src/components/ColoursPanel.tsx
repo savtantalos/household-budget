@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
-import { api } from '../api'
+import { useMemo } from 'react'
 import { chartColor, parseChartColors } from '../format'
 import type { Account, Investment, SavingsPlan, Settings } from '../types'
 
@@ -7,6 +6,8 @@ interface Props {
   investments: Investment[]
   savingsPlans: SavingsPlan[]
   accounts: Account[]
+  settings: Settings
+  onSettingsChange: (payload: Partial<Settings>) => void
 }
 
 interface SeriesItem {
@@ -15,13 +16,13 @@ interface SeriesItem {
   fallbackIndex: number
 }
 
-export function ColoursPanel({ investments, savingsPlans, accounts }: Props) {
-  const [settings, setSettings] = useState<Settings | null>(null)
-
-  useEffect(() => {
-    void api.settings().then(setSettings)
-  }, [])
-
+export function ColoursPanel({
+  investments,
+  savingsPlans,
+  accounts,
+  settings,
+  onSettingsChange,
+}: Props) {
   const colors = useMemo(() => parseChartColors(settings), [settings])
 
   const series = useMemo<SeriesItem[]>(() => {
@@ -85,7 +86,7 @@ export function ColoursPanel({ investments, savingsPlans, accounts }: Props) {
 
   const updateColor = (key: string, value: string) => {
     const next = { ...colors, [key]: value }
-    void api.updateSettings({ chart_colors: JSON.stringify(next) }).then(setSettings)
+    onSettingsChange({ chart_colors: JSON.stringify(next) })
   }
 
   return (

@@ -27,24 +27,44 @@ interface Props {
   accounts: Account[]
   people: Person[]
   onChange: () => Promise<void>
+  settings: Settings
+  onSettingsChange: (payload: Partial<Settings>) => void
 }
 
-export function SavingsPanel({ savingsPlans, accounts, people, onChange }: Props) {
-  const [years, setYears] = useState(5)
-  const [returnPct, setReturnPct] = useState(5)
+export function SavingsPanel({
+  savingsPlans,
+  accounts,
+  people,
+  onChange,
+  settings,
+  onSettingsChange,
+}: Props) {
+  const years = settings.savings_years
+  const returnPct = settings.savings_annual_return_pct
   const [projection, setProjection] = useState<Projection | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const [institution, setInstitution] = useState('')
   const [balance, setBalance] = useState('')
   const [accountPersonId, setAccountPersonId] = useState(people[0]?.id ?? 0)
-  const [settings, setSettings] = useState<Settings | null>(null)
 
   useEffect(() => {
-    void api.settings().then(setSettings)
-  }, [])
-
-  useEffect(() => {
-    void api.projection(years, returnPct).then(setProjection)
+    let active = true
+    const timer = setTimeout(() => {
+      void api.projection(years, returnPct)
+        .then((value) => {
+          if (!active) return
+          setProjection(value)
+          setError(null)
+        })
+        .catch((err: Error) => {
+          if (active) setError(err.message)
+        })
+    }, 200)
+    return () => {
+      active = false
+      clearTimeout(timer)
+    }
   }, [years, returnPct, savingsPlans, accounts])
 
   const colors = parseChartColors(settings)
@@ -203,17 +223,29 @@ export function SavingsPanel({ savingsPlans, accounts, people, onChange }: Props
       <section className="card">
         <h2>Savings simulator</h2>
         <div className="controls">
-          <SliderInput label="Years" value={years} onChange={setYears} min={1} max={30} />
+          <SliderInput
+            label="Years"
+            value={years}
+            onChange={(value) => onSettingsChange({ savings_years: value })}
+            min={1}
+            max={30}
+          />
           <SliderInput
             label="Annual return"
             value={returnPct}
-            onChange={setReturnPct}
+            onChange={(value) => onSettingsChange({ savings_annual_return_pct: value })}
             min={0}
             max={12}
             step={0.5}
             format={(value) => `${value}%`}
           />
         </div>
+        {error && (
+          <div className="error">
+            <strong>Could not run the savings projection.</strong>
+            <p>{error}</p>
+          </div>
+        )}
         {projection && (
           <p className="muted">
             Saving {money(projection.monthly_contribution)}/month on top of{' '}

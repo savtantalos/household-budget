@@ -43,42 +43,45 @@ function Stat({
   )
 }
 
-export function MortgagePanel() {
-  const [loaded, setLoaded] = useState(false)
+interface Props {
+  settings: Settings
+  onSettingsChange: (payload: Partial<Settings>) => void
+}
 
-  const [principal, setPrincipal] = useState(300000)
-  const [ratePct, setRatePct] = useState(4.5)
-  const [termYears, setTermYears] = useState(25)
-  const [overpayment, setOverpayment] = useState(0)
-  const [lumpSums, setLumpSums] = useState<LumpSum[]>([])
-  const [lumpMonth, setLumpMonth] = useState('12')
-  const [lumpAmount, setLumpAmount] = useState('10000')
+export function MortgagePanel({ settings, onSettingsChange }: Props) {
+  const principal = settings.mortgage_principal
+  const ratePct = settings.mortgage_rate_pct
+  const termYears = settings.mortgage_term_years
+  const overpayment = settings.mortgage_overpayment
+  const lumpMonth = settings.mortgage_lump_month
+  const lumpAmount = settings.mortgage_lump_amount
+  const lumpSums = useMemo<LumpSum[]>(() => {
+    try {
+      const parsed: unknown = JSON.parse(settings.mortgage_lump_sums)
+      if (!Array.isArray(parsed)) return []
+      return parsed.filter(
+        (item): item is LumpSum =>
+          item !== null &&
+          typeof item === 'object' &&
+          typeof item.month === 'number' &&
+          Number.isFinite(item.month) &&
+          typeof item.amount === 'number' &&
+          Number.isFinite(item.amount),
+      )
+    } catch {
+      return []
+    }
+  }, [settings.mortgage_lump_sums])
 
   const [result, setResult] = useState<Mortgage | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [settings, setSettings] = useState<Settings | null>(null)
-
-  useEffect(() => {
-    void api.settings().then((loaded: Settings) => {
-      setSettings(loaded)
-      setPrincipal(loaded.mortgage_principal)
-      setRatePct(loaded.mortgage_rate_pct)
-      setTermYears(loaded.mortgage_term_years)
-      setOverpayment(loaded.mortgage_overpayment)
-      try {
-        setLumpSums(JSON.parse(loaded.mortgage_lump_sums) as LumpSum[])
-      } catch {
-        setLumpSums([])
-      }
-      setLoaded(true)
-    })
-  }, [])
 
   const colors = parseChartColors(settings)
 
   useEffect(() => {
+    let active = true
     const timer = setTimeout(() => {
-      api
+      void api
         .mortgage({
           principal,
           annual_rate_pct: ratePct,
@@ -87,34 +90,19 @@ export function MortgagePanel() {
           lump_sums: lumpSums,
         })
         .then((value) => {
+          if (!active) return
           setResult(value)
           setError(null)
         })
-        .catch((err: Error) => setError(err.message))
+        .catch((err: Error) => {
+          if (active) setError(err.message)
+        })
     }, 200)
-    return () => clearTimeout(timer)
+    return () => {
+      active = false
+      clearTimeout(timer)
+    }
   }, [principal, ratePct, termYears, overpayment, lumpSums])
-
-  useEffect(() => {
-    if (!loaded) return
-    const timer = setTimeout(() => {
-      void api.updateSettings({
-        mortgage_principal: principal,
-        mortgage_rate_pct: ratePct,
-        mortgage_term_years: termYears,
-        mortgage_overpayment: overpayment,
-        mortgage_lump_sums: JSON.stringify(lumpSums),
-      })
-    }, 500)
-    return () => clearTimeout(timer)
-  }, [
-    loaded,
-    principal,
-    ratePct,
-    termYears,
-    overpayment,
-    lumpSums,
-  ])
 
   const chartData = useMemo(() => {
     const points = result?.points ?? []
@@ -133,7 +121,9 @@ export function MortgagePanel() {
     const month = Number(lumpMonth)
     const amount = Number(lumpAmount)
     if (!month || month < 1 || !amount) return
-    setLumpSums((current) => [...current, { month, amount }])
+    onSettingsChange({
+      mortgage_lump_sums: JSON.stringify([...lumpSums, { month, amount }]),
+    })
   }
 
   return (
@@ -144,7 +134,7 @@ export function MortgagePanel() {
           <SliderInput
             label="Amount owed"
             value={principal}
-            onChange={setPrincipal}
+            onChange={(value) => onSettingsChange({ mortgage_principal: value })}
             min={25000}
             max={1000000}
             step={5000}
@@ -153,7 +143,7 @@ export function MortgagePanel() {
           <SliderInput
             label="Interest rate"
             value={ratePct}
-            onChange={setRatePct}
+            onChange={(value) => onSettingsChange({ mortgage_rate_pct: value })}
             min={0}
             max={12}
             step={0.05}
@@ -162,7 +152,7 @@ export function MortgagePanel() {
           <SliderInput
             label="Term"
             value={termYears}
-            onChange={setTermYears}
+            onChange={(value) => onSettingsChange({ mortgage_term_years: value })}
             min={1}
             max={40}
             format={(value) => `${value} years`}
@@ -170,7 +160,7 @@ export function MortgagePanel() {
           <SliderInput
             label="Monthly overpayment"
             value={overpayment}
-            onChange={setOverpayment}
+            onChange={(value) => onSettingsChange({ mortgage_overpayment: value })}
             min={0}
             max={3000}
             step={25}
@@ -207,12 +197,14 @@ export function MortgagePanel() {
                       <button
                         className="danger"
                         onClick={() =>
-                          setLumpSums((current) =>
-                            current.filter(
-                              (item) =>
-                                !(item.month === lump.month && item.amount === lump.amount),
+                          onSettingsChange({
+                            mortgage_lump_sums: JSON.stringify(
+                              lumpSums.filter(
+                                (item) =>
+                                  !(item.month === lump.month && item.amount === lump.amount),
+                              ),
                             ),
-                          )
+                          })
                         }
                       >
                         Delete
@@ -229,14 +221,14 @@ export function MortgagePanel() {
             min={1}
             placeholder="Month"
             value={lumpMonth}
-            onChange={(event) => setLumpMonth(event.target.value)}
+            onChange={(event) => onSettingsChange({ mortgage_lump_month: event.target.value })}
           />
           <input
             type="number"
             step="500"
             placeholder="Amount"
             value={lumpAmount}
-            onChange={(event) => setLumpAmount(event.target.value)}
+            onChange={(event) => onSettingsChange({ mortgage_lump_amount: event.target.value })}
           />
           <button type="submit">Add lump sum</button>
         </form>
