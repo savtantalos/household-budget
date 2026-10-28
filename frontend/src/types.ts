@@ -27,6 +27,8 @@ export interface Income {
   person_id: number
   label: string
   amount: number
+  due_day: number | null
+  due_date: string | null
   frequency: Frequency
 }
 
@@ -37,6 +39,7 @@ export interface Expense {
   amount: number
   category: string
   due_day: number | null
+  due_date: string | null
   shared: boolean
   frequency: Frequency
 }

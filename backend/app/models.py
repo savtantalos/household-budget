@@ -29,6 +29,8 @@ class Income(SQLModel, table=True):
     person_id: int = Field(foreign_key="person.id", index=True)
     label: str
     amount: float
+    due_day: int | None = None
+    due_date: date | None = None
     frequency: Frequency = Frequency.monthly
 
 
@@ -46,6 +48,7 @@ class Expense(SQLModel, table=True):
     amount: float
     category: str = "general"
     due_day: int | None = None
+    due_date: date | None = None
     shared: bool = True
     frequency: Frequency = Frequency.monthly
 

@@ -35,10 +35,15 @@ the system prompt, your budget numbers, and the last 20 messages
 | Chat messages | `chatmessage` table in `backend/budget.db` | One conversation per user; "Clear chat" deletes your rows |
 | API key | `backend/.env` (gitignored) | Server only. Never put it in frontend code or git |
 | System prompt | `SYSTEM_PROMPT` in `backend/app/chat.py` | Edit it to change tone or rules |
-| Budget numbers sent to Claude | Built fresh each message by `budget_context()` | Totals, per-person figures, settlements |
+| Budget numbers sent to Claude | Built fresh each message by `budget_context()` from a `ChatContext` | Totals, per-person figures, settlements, every expense with its pay date, incomes, savings plans, investments, account balances, and the saved mortgage / invest-vs-overpay inputs |
 
-Privacy: each question sends your household totals and recent chat to Anthropic.
-Individual expense names are not sent, only the dashboard summary.
+Privacy: each question sends your household's full budget — including expense
+names and pay dates — plus recent chat to Anthropic.
+
+Expense pay dates let Claude answer "which payments are due before the 15th?"
+and "how much will be left?": monthly expenses use `due_day` (day of month),
+while yearly and one-off expenses use `due_date` (a full date, repeating
+annually for yearly items).
 
 ## 13.3 Setting it up
 

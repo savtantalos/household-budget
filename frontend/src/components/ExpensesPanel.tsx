@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
 import { api } from '../api'
 import { money } from '../format'
-import type { Category, Expense, Person } from '../types'
+import type { Category, Expense, Frequency, Person } from '../types'
+
+const FREQUENCIES: Frequency[] = ['monthly', 'yearly', 'one_off']
 
 interface Props {
   expenses: Expense[]
@@ -16,6 +18,9 @@ export function ExpensesPanel({ expenses, people, categories, onChange }: Props)
   const [payerId, setPayerId] = useState(people[0]?.id ?? 0)
   const [categoryId, setCategoryId] = useState(categories[0]?.id ?? 0)
   const [shared, setShared] = useState(true)
+  const [frequency, setFrequency] = useState<Frequency>('monthly')
+  const [dueDay, setDueDay] = useState('')
+  const [dueDate, setDueDate] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const categoryNames = useMemo(
@@ -43,9 +48,14 @@ export function ExpensesPanel({ expenses, people, categories, onChange }: Props)
         payer_id: payerId,
         category: selectedCategory.name,
         shared,
+        frequency,
+        due_day: frequency === 'monthly' && dueDay ? Number(dueDay) : null,
+        due_date: frequency !== 'monthly' && dueDate ? dueDate : null,
       })
       setLabel('')
       setAmount('')
+      setDueDay('')
+      setDueDate('')
       await onChange()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add expense')
@@ -107,6 +117,8 @@ export function ExpensesPanel({ expenses, people, categories, onChange }: Props)
               <th>Amount</th>
               <th>Paid by</th>
               <th>Category</th>
+              <th>Frequency</th>
+              <th>Pay date</th>
               <th>Shared</th>
               <th />
             </tr>
@@ -173,6 +185,61 @@ export function ExpensesPanel({ expenses, people, categories, onChange }: Props)
                   </select>
                 </td>
                 <td>
+                  <select
+                    aria-label={`Frequency for ${expense.label}`}
+                    value={expense.frequency}
+                    onChange={(event) =>
+                      void patch(expense, {
+                        frequency: event.target.value as Frequency,
+                      })
+                    }
+                  >
+                    {FREQUENCIES.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td>
+                  {expense.frequency === 'monthly' ? (
+                    <input
+                      type="number"
+                      min={1}
+                      max={31}
+                      placeholder="day"
+                      aria-label={`Pay day for ${expense.label}`}
+                      style={{ width: '4.5rem' }}
+                      key={`${expense.id}-day-${expense.due_day}`}
+                      defaultValue={expense.due_day ?? ''}
+                      onBlur={(event) => {
+                        const raw = event.target.value.trim()
+                        const value = raw ? Number(raw) : null
+                        if (value !== null && (value < 1 || value > 31)) {
+                          event.target.value = expense.due_day?.toString() ?? ''
+                          return
+                        }
+                        if (value !== expense.due_day) {
+                          void patch(expense, { due_day: value })
+                        }
+                      }}
+                    />
+                  ) : (
+                    <input
+                      type="date"
+                      aria-label={`Pay date for ${expense.label}`}
+                      key={`${expense.id}-date-${expense.due_date}`}
+                      defaultValue={expense.due_date ?? ''}
+                      onChange={(event) => {
+                        const value = event.target.value || null
+                        if (value !== expense.due_date) {
+                          void patch(expense, { due_date: value })
+                        }
+                      }}
+                    />
+                  )}
+                </td>
+                <td>
                   <input
                     type="checkbox"
                     checked={expense.shared}
@@ -198,7 +265,7 @@ export function ExpensesPanel({ expenses, people, categories, onChange }: Props)
           <tfoot>
             <tr>
               <td>Total</td>
-              <td colSpan={5}>{money(total)}</td>
+              <td colSpan={7}>{money(total)}</td>
             </tr>
           </tfoot>
         </table>
@@ -239,6 +306,36 @@ export function ExpensesPanel({ expenses, people, categories, onChange }: Props)
               </option>
             ))}
           </select>
+          <select
+            aria-label="New expense frequency"
+            value={frequency}
+            onChange={(event) => setFrequency(event.target.value as Frequency)}
+          >
+            {FREQUENCIES.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+          {frequency === 'monthly' ? (
+            <input
+              type="number"
+              min={1}
+              max={31}
+              placeholder="Pay day"
+              aria-label="New expense pay day"
+              style={{ width: '5.5rem' }}
+              value={dueDay}
+              onChange={(event) => setDueDay(event.target.value)}
+            />
+          ) : (
+            <input
+              type="date"
+              aria-label="New expense pay date"
+              value={dueDate}
+              onChange={(event) => setDueDate(event.target.value)}
+            />
+          )}
           <label className="inline">
             <input
               type="checkbox"
@@ -251,6 +348,8 @@ export function ExpensesPanel({ expenses, people, categories, onChange }: Props)
         </form>
         <p className="muted">
           Shared items are split evenly; unshared ones stay with {nameOf(payerId)} or whoever pays.
+          Pay day is the day of the month a monthly expense leaves the account; yearly and one-off
+          expenses use a full date.
         </p>
       </section>
 

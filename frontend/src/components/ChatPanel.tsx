@@ -3,9 +3,10 @@ import { api } from '../api'
 import type { ChatMessage } from '../types'
 
 const SUGGESTIONS = [
+  'Which payments are due before the 15th, and how much is left?',
   'Can we afford a £300 holiday next month?',
-  'Where could we cut back?',
-  'Explain our settlement in simple terms.',
+  'What will our investments be worth in 10 years?',
+  'How much interest do we save with our mortgage overpayment?',
 ]
 
 function readable(error: unknown) {

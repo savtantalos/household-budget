@@ -20,7 +20,7 @@ from .budget import (
     project_savings,
     simulate_mortgage,
 )
-from .chat import ask, get_chat_model
+from .chat import ChatContext, ask, get_chat_model
 from .crud import crud_router
 from .db import get_session, init_db
 from .models import (
@@ -625,8 +625,26 @@ def post_chat(
     question = payload.message.strip()
     if not question:
         raise HTTPException(status_code=422, detail="Message is empty")
+    context = ChatContext(
+        summary=get_summary(session, user),
+        people=list(session.exec(select(Person).where(Person.user_id == user.id)).all()),
+        incomes=list(session.exec(select(Income).where(Income.user_id == user.id)).all()),
+        expenses=list(
+            session.exec(select(Expense).where(Expense.user_id == user.id)).all()
+        ),
+        plans=list(
+            session.exec(select(SavingsPlan).where(SavingsPlan.user_id == user.id)).all()
+        ),
+        investments=list(
+            session.exec(select(Investment).where(Investment.user_id == user.id)).all()
+        ),
+        accounts=list(
+            session.exec(select(Account).where(Account.user_id == user.id)).all()
+        ),
+        settings=_settings(session, user.id),
+    )
     try:
-        reply = ask(llm, get_summary(session, user), _chat_history(session, user), question)
+        reply = ask(llm, context, _chat_history(session, user), question)
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

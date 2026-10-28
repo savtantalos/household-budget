@@ -662,11 +662,60 @@ def test_chat_provider_error_is_reported_and_not_saved(client):
 
 
 def test_chat_prompt_contains_the_household_numbers(client):
-    from app.chat import budget_context
+    from app.chat import ChatContext, budget_context
+    from app.models import Expense
     from app.schemas import SummaryOut
 
-    context = budget_context(SummaryOut(**client.get("/api/summary").json()))
+    context = budget_context(
+        ChatContext(summary=SummaryOut(**client.get("/api/summary").json()))
+    )
     assert "Total income: £10,750.00" in context
     assert "Settlement: Savvas pays Georgia £722.70" in context
     assert "before savings: £6,546.65" in context
     assert "after expenses and savings: £3,046.65" in context
+
+
+def test_expense_pay_dates_round_trip(client):
+    expense_id = client.get("/api/expenses").json()[0]["id"]
+
+    updated = client.patch(
+        f"/api/expenses/{expense_id}", json={"due_day": 14, "due_date": "2026-11-01"}
+    )
+    assert updated.status_code == 200
+    assert updated.json()["due_day"] == 14
+    assert updated.json()["due_date"] == "2026-11-01"
+    assert client.get("/api/expenses").json()[0]["due_day"] == 14
+
+    assert (
+        client.patch(f"/api/expenses/{expense_id}", json={"due_day": 32}).status_code
+        == 422
+    )
+
+    cleared = client.patch(f"/api/expenses/{expense_id}", json={"due_day": None})
+    assert cleared.json()["due_day"] is None
+
+
+def test_chat_context_lists_expense_pay_dates(client):
+    from sqlmodel import select
+
+    from app.chat import ChatContext, budget_context
+    from app.models import Expense, Person
+    from app.schemas import SummaryOut
+
+    expense = client.get("/api/expenses").json()[0]
+    client.patch(f"/api/expenses/{expense['id']}", json={"due_day": 3})
+
+    session = client.app.dependency_overrides[get_session]()
+    people = list(session.exec(select(Person)).all())
+    expenses = list(session.exec(select(Expense)).all())
+
+    context = budget_context(
+        ChatContext(
+            summary=SummaryOut(**client.get("/api/summary").json()),
+            people=people,
+            expenses=expenses,
+        )
+    )
+    assert "Expenses:" in context
+    assert "paid on day 3 of each month" in context
+    assert "no pay day set" in context

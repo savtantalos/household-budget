@@ -26,18 +26,22 @@ from .models import (
 
 PEOPLE = [("Savvas", "#2f6fed"), ("Georgia", "#e0629b")]
 
-INCOMES = [("Savvas", "Salary", 6000.0), ("Georgia", "Salary", 4750.0)]
+# (person, label, monthly amount, pay day of month)
+INCOMES = [
+    ("Savvas", "Salary", 6000.0, 25),
+    ("Georgia", "Salary", 4750.0, 28),
+]
 
-# (payer, label, amount, category, shared)
+# (payer, label, amount, category, shared, due_day)
 EXPENSES = [
-    ("Georgia", "Mortgage", 3000.0, "housing", True),
-    ("Georgia", "Super", 400.0, "housing", True),
-    ("Savvas", "Electricity", 93.0, "utilities", True),
-    ("Savvas", "Council tax", 201.0, "utilities", True),
-    ("Savvas", "Internet", 45.0, "utilities", True),
-    ("Savvas", "Water", 58.35, "utilities", True),
-    ("Savvas", "Car service", 38.0, "transport", False),
-    ("Savvas", "Gym", 368.0, "lifestyle", False),
+    ("Georgia", "Mortgage", 3000.0, "housing", True, 1),
+    ("Georgia", "Super", 400.0, "housing", True, 1),
+    ("Savvas", "Electricity", 93.0, "utilities", True, 12),
+    ("Savvas", "Council tax", 201.0, "utilities", True, 5),
+    ("Savvas", "Internet", 45.0, "utilities", True, 18),
+    ("Savvas", "Water", 58.35, "utilities", True, 20),
+    ("Savvas", "Car service", 38.0, "transport", False, None),
+    ("Savvas", "Gym", 368.0, "lifestyle", False, 26),
 ]
 
 # (from, to, label, monthly amount, months remaining)
@@ -117,14 +121,18 @@ def seed(
         people[name] = person
     session.commit()
 
-    for name, label, amount in INCOMES:
+    for name, label, amount, due_day in INCOMES:
         session.add(
             Income(
-                user_id=user.id, person_id=people[name].id, label=label, amount=amount
+                user_id=user.id,
+                person_id=people[name].id,
+                label=label,
+                amount=amount,
+                due_day=due_day,
             )
         )
 
-    for payer, label, amount, category, shared in EXPENSES:
+    for payer, label, amount, category, shared, due_day in EXPENSES:
         session.add(
             Expense(
                 user_id=user.id,
@@ -133,6 +141,7 @@ def seed(
                 amount=amount,
                 category=category,
                 shared=shared,
+                due_day=due_day,
             )
         )
 
@@ -180,7 +189,7 @@ def seed(
     session.commit()
 
     # Seed categories used by the sample expenses.
-    expense_categories = {category.lower() for _, _, _, category, _ in EXPENSES}
+    expense_categories = {category.lower() for _, _, _, category, _, _ in EXPENSES}
     existing_categories = {
         c.name
         for c in session.exec(

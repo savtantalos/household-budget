@@ -42,6 +42,8 @@ class IncomeCreate(SQLModel):
     person_id: int
     label: str
     amount: float
+    due_day: int | None = Field(default=None, ge=1, le=31)
+    due_date: date | None = None
     frequency: Frequency = Frequency.monthly
 
 
@@ -49,6 +51,8 @@ class IncomeUpdate(SQLModel):
     person_id: int | None = None
     label: str | None = None
     amount: float | None = None
+    due_day: int | None = Field(default=None, ge=1, le=31)
+    due_date: date | None = None
     frequency: Frequency | None = None
 
 
@@ -57,7 +61,8 @@ class ExpenseCreate(SQLModel):
     label: str
     amount: float
     category: str = "general"
-    due_day: int | None = None
+    due_day: int | None = Field(default=None, ge=1, le=31)
+    due_date: date | None = None
     shared: bool = True
     frequency: Frequency = Frequency.monthly
 
@@ -67,7 +72,8 @@ class ExpenseUpdate(SQLModel):
     label: str | None = None
     amount: float | None = None
     category: str | None = None
-    due_day: int | None = None
+    due_day: int | None = Field(default=None, ge=1, le=31)
+    due_date: date | None = None
     shared: bool | None = None
     frequency: Frequency | None = None
 

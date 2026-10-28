@@ -164,6 +164,34 @@ def _ensure_default_categories() -> None:
         session.commit()
 
 
+def _ensure_expense_columns() -> None:
+    """Add expense columns introduced after the initial schema."""
+    inspector = inspect(engine)
+    if "expense" not in inspector.get_table_names():
+        return
+
+    columns = {c["name"] for c in inspector.get_columns("expense")}
+    with engine.begin() as conn:
+        if "due_day" not in columns:
+            conn.execute(text("ALTER TABLE expense ADD COLUMN due_day INTEGER"))
+        if "due_date" not in columns:
+            conn.execute(text("ALTER TABLE expense ADD COLUMN due_date DATE"))
+
+
+def _ensure_income_columns() -> None:
+    """Add income columns introduced after the initial schema."""
+    inspector = inspect(engine)
+    if "income" not in inspector.get_table_names():
+        return
+
+    columns = {c["name"] for c in inspector.get_columns("income")}
+    with engine.begin() as conn:
+        if "due_day" not in columns:
+            conn.execute(text("ALTER TABLE income ADD COLUMN due_day INTEGER"))
+        if "due_date" not in columns:
+            conn.execute(text("ALTER TABLE income ADD COLUMN due_date DATE"))
+
+
 def _ensure_investment_color_column() -> None:
     """Add the optional color column to existing investment tables."""
     inspector = inspect(engine)
@@ -183,6 +211,8 @@ def init_db() -> None:
     _ensure_user_id_columns()
     _ensure_setting_columns()
     _ensure_default_categories()
+    _ensure_expense_columns()
+    _ensure_income_columns()
     _ensure_investment_color_column()
 
 

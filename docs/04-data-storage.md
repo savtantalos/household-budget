@@ -58,6 +58,7 @@ colour                     label                     label
                            amount                    amount
                            frequency                 category
                                                      due_day
+                                                     due_date   (date)
 transfer                   savingsplan               shared     (bool)
 ──────────                 ──────────                frequency
 id             PK          id            PK

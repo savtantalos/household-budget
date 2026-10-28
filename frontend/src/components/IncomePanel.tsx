@@ -17,6 +17,8 @@ export function IncomePanel({ incomes, transfers, people, onChange }: Props) {
   const [amount, setAmount] = useState('')
   const [personId, setPersonId] = useState(people[0]?.id ?? 0)
   const [frequency, setFrequency] = useState<Frequency>('monthly')
+  const [dueDay, setDueDay] = useState('')
+  const [dueDate, setDueDate] = useState('')
 
   const [transferLabel, setTransferLabel] = useState('')
   const [transferAmount, setTransferAmount] = useState('')
@@ -31,9 +33,13 @@ export function IncomePanel({ incomes, transfers, people, onChange }: Props) {
       amount: Number(amount),
       person_id: personId,
       frequency,
+      due_day: frequency === 'monthly' && dueDay ? Number(dueDay) : null,
+      due_date: frequency !== 'monthly' && dueDate ? dueDate : null,
     })
     setLabel('')
     setAmount('')
+    setDueDay('')
+    setDueDate('')
     await onChange()
   }
 
@@ -62,6 +68,7 @@ export function IncomePanel({ incomes, transfers, people, onChange }: Props) {
               <th>Amount</th>
               <th>Person</th>
               <th>Frequency</th>
+              <th>Pay date</th>
               <th />
             </tr>
           </thead>
@@ -128,6 +135,46 @@ export function IncomePanel({ incomes, transfers, people, onChange }: Props) {
                   </select>
                 </td>
                 <td>
+                  {income.frequency === 'monthly' ? (
+                    <input
+                      type="number"
+                      min={1}
+                      max={31}
+                      placeholder="day"
+                      aria-label={`Pay day for ${income.label}`}
+                      style={{ width: '4.5rem' }}
+                      key={`${income.id}-day-${income.due_day}`}
+                      defaultValue={income.due_day ?? ''}
+                      onBlur={async (event) => {
+                        const raw = event.target.value.trim()
+                        const value = raw ? Number(raw) : null
+                        if (value !== null && (value < 1 || value > 31)) {
+                          event.target.value = income.due_day?.toString() ?? ''
+                          return
+                        }
+                        if (value !== income.due_day) {
+                          await api.incomes.update(income.id, { due_day: value })
+                          await onChange()
+                        }
+                      }}
+                    />
+                  ) : (
+                    <input
+                      type="date"
+                      aria-label={`Pay date for ${income.label}`}
+                      key={`${income.id}-date-${income.due_date}`}
+                      defaultValue={income.due_date ?? ''}
+                      onChange={async (event) => {
+                        const value = event.target.value || null
+                        if (value !== income.due_date) {
+                          await api.incomes.update(income.id, { due_date: value })
+                          await onChange()
+                        }
+                      }}
+                    />
+                  )}
+                </td>
+                <td>
                   <button
                     className="danger"
                     onClick={async () => {
@@ -173,6 +220,25 @@ export function IncomePanel({ incomes, transfers, people, onChange }: Props) {
               </option>
             ))}
           </select>
+          {frequency === 'monthly' ? (
+            <input
+              type="number"
+              min={1}
+              max={31}
+              placeholder="Pay day"
+              aria-label="New income pay day"
+              style={{ width: '5.5rem' }}
+              value={dueDay}
+              onChange={(event) => setDueDay(event.target.value)}
+            />
+          ) : (
+            <input
+              type="date"
+              aria-label="New income pay date"
+              value={dueDate}
+              onChange={(event) => setDueDate(event.target.value)}
+            />
+          )}
           <button type="submit">Add</button>
         </form>
       </section>
