@@ -287,6 +287,7 @@ def _settings_out(setting: Setting) -> schemas.SettingsOut:
         invest_comparison_years=setting.invest_comparison_years,
         invest_return_spread_pct=setting.invest_return_spread_pct,
         chart_colors=setting.chart_colors,
+        theme=setting.theme,
     )
 
 

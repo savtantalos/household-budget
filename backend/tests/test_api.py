@@ -84,6 +84,10 @@ def test_settings_rejects_an_unknown_split_mode(client):
     assert client.patch("/api/settings", json={"split_mode": "vibes"}).status_code == 422
 
 
+def test_settings_rejects_an_unknown_theme(client):
+    assert client.patch("/api/settings", json={"theme": "sepia"}).status_code == 422
+
+
 CHART_DEFAULTS = {
     "savings_years": 5,
     "savings_annual_return_pct": 5.0,
@@ -92,6 +96,7 @@ CHART_DEFAULTS = {
     "mortgage_lump_amount": "10000",
     "invest_comparison_years": None,
     "invest_return_spread_pct": 3.0,
+    "theme": "system",
 }
 
 CHART_INPUTS = {
@@ -114,6 +119,7 @@ CHART_INPUTS = {
     "invest_return_spread_pct": 4.5,
     "split_mode": "difference",
     "chart_colors": '{"savings":"#123456"}',
+    "theme": "dark",
 }
 
 

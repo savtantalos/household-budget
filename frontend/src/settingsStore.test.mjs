@@ -20,6 +20,7 @@ const defaults = {
   invest_annual_return_pct: 7,
   chart_colors: '{}',
   split_mode: 'even',
+  theme: 'system',
 }
 
 function deferred() {

@@ -2,7 +2,7 @@ from datetime import date, datetime
 
 from sqlmodel import Field, SQLModel
 
-from .models import ChatRole, Frequency, SplitMode
+from .models import ChatRole, Frequency, SplitMode, Theme
 
 
 class UserCreate(SQLModel):
@@ -197,6 +197,7 @@ class SettingsOut(SQLModel):
     invest_comparison_years: int | None
     invest_return_spread_pct: float
     chart_colors: str
+    theme: Theme
 
 
 class SettingsUpdate(SQLModel):
@@ -219,6 +220,7 @@ class SettingsUpdate(SQLModel):
     invest_comparison_years: int | None = Field(default=None, ge=1, le=40)
     invest_return_spread_pct: float | None = Field(default=None, ge=0, le=15)
     chart_colors: str | None = None
+    theme: Theme | None = None
 
 
 class ProjectionPointOut(SQLModel):

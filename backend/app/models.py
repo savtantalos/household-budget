@@ -100,6 +100,14 @@ class SplitMode(str, Enum):
     difference = "difference"
 
 
+class Theme(str, Enum):
+    """UI colour scheme preference."""
+
+    system = "system"
+    light = "light"
+    dark = "dark"
+
+
 class Setting(SQLModel, table=True):
     """Single-row household preferences and persisted simulation inputs per user."""
 
@@ -130,6 +138,9 @@ class Setting(SQLModel, table=True):
 
     # User-selected chart colours, stored as a JSON map keyed by series id.
     chart_colors: str = "{}"
+
+    # UI colour scheme: follows the OS by default.
+    theme: Theme = Theme.system
 
 
 class Account(SQLModel, table=True):

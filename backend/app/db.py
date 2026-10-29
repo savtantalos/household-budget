@@ -125,6 +125,7 @@ def _ensure_setting_columns() -> None:
         ("invest_comparison_years", "INTEGER DEFAULT NULL"),
         ("invest_return_spread_pct", "REAL DEFAULT 3"),
         ("chart_colors", "TEXT DEFAULT '{}'"),
+        ("theme", "TEXT DEFAULT 'system'"),
     ]
 
     with engine.begin() as conn:

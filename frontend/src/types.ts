@@ -118,6 +118,8 @@ export interface Summary {
 
 export type SplitMode = 'even' | 'difference'
 
+export type Theme = 'system' | 'light' | 'dark'
+
 export interface Settings {
   savings_years: number
   savings_annual_return_pct: number
@@ -138,6 +140,7 @@ export interface Settings {
   invest_comparison_years: number | null
   invest_return_spread_pct: number
   chart_colors: string
+  theme: Theme
 }
 
 export interface ProjectionPoint {
